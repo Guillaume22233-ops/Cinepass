@@ -15,6 +15,8 @@ header('Cache-Control: no-store');
 const DB_FILE = __DIR__ . '/data/db.php';
 const DB_GUARD = "<?php exit; ?>\n";
 const TYPES = ['cinecheque', 'pathe'];
+const PDF_DIR = __DIR__ . '/data/pdf';
+const PDF_MAX = 15 * 1024 * 1024; // 15 Mo
 
 function out($data, $status = 200) {
     http_response_code($status);
@@ -135,7 +137,7 @@ case 'claim':
         }
         return [null, false];
     });
-    if (!$code) out(['error' => 'Plus de code disponible'], 409);
+    if (!$code) out(['error' => 'Plus de place disponible'], 409);
     out(['code' => $code]);
 
 case 'films':
@@ -182,6 +184,33 @@ case 'films':
     }
     @file_put_contents($cache, DB_GUARD . json_encode($films, JSON_UNESCAPED_UNICODE));
     out(['films' => $films]);
+
+case 'pdf':
+    // Le PDF n'est accessible qu'au profil qui a réservé la place, ou à l'admin.
+    need_login();
+    $id = (string)($_GET['id'] ?? '');
+    $me = $_SESSION['profile'] ?? null;
+    $isAdmin = !empty($_SESSION['admin']);
+    $c = with_db(function (&$db) use ($id) {
+        foreach ($db['codes'] as $c) if ($c['id'] === $id) return [$c, false];
+        return [null, false];
+    });
+    $path = ($c && !empty($c['file'])) ? PDF_DIR . '/' . basename($c['file']) : null;
+    if (!$path || !is_file($path) || !($isAdmin || ($c['taken'] && $c['takenBy'] === $me))) {
+        header('Content-Type: text/plain; charset=utf-8');
+        http_response_code(404);
+        echo 'Place introuvable.';
+        exit;
+    }
+    $label = ['cinecheque' => 'CineCheque', 'pathe' => 'Pathe'][$c['type']] ?? 'Place';
+    $fname = $label . '-' . trim(preg_replace('/[^A-Za-z0-9_-]+/', '-', $c['code']), '-') . '.pdf';
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: ' . (isset($_GET['dl']) ? 'attachment' : 'inline') . '; filename="' . $fname . '"');
+    header('Content-Length: ' . filesize($path));
+    header('X-Content-Type-Options: nosniff');
+    header('Cache-Control: private, no-store');
+    readfile($path);
+    exit;
 
 // ---------- Gestion ----------
 case 'admin_login':
@@ -253,6 +282,28 @@ case 'admin_add':
     });
     out(['added' => $added]);
 
+case 'admin_upload':
+    need_admin();
+    $type = $_POST['type'] ?? '';
+    if (!in_array($type, TYPES, true)) out(['error' => 'Type inconnu'], 400);
+    $f = $_FILES['file'] ?? null;
+    if (!$f || $f['error'] !== UPLOAD_ERR_OK) out(['error' => 'Envoi échoué (fichier trop lourd ?)'], 400);
+    if ($f['size'] > PDF_MAX) out(['error' => 'PDF trop lourd (15 Mo max)'], 400);
+    if (file_get_contents($f['tmp_name'], false, null, 0, 5) !== '%PDF-') out(['error' => "Ce fichier n'est pas un PDF"], 400);
+    if (!is_dir(PDF_DIR)) @mkdir(PDF_DIR, 0755, true);
+    $hash = sha1_file($f['tmp_name']);
+    $label = mb_substr(preg_replace('/\.pdf$/i', '', basename($f['name'])), 0, 120);
+    $res = with_db(function (&$db) use ($type, $f, $hash, $label) {
+        foreach ($db['codes'] as $c) if (($c['hash'] ?? null) === $hash) return [['dup' => true], false];
+        $id = bin2hex(random_bytes(8));
+        if (!move_uploaded_file($f['tmp_name'], PDF_DIR . "/$id.pdf")) return [['error' => "Impossible d'enregistrer le PDF (dossier data/)"], false];
+        $db['codes'][] = ['id' => $id, 'type' => $type, 'code' => $label, 'file' => "$id.pdf", 'hash' => $hash,
+                          'taken' => false, 'takenBy' => null, 'takenAt' => null, 'addedAt' => (int)(microtime(true) * 1000)];
+        return [['ok' => true], true];
+    });
+    if (isset($res['error'])) out($res, 500);
+    out($res);
+
 case 'admin_delete':
 case 'admin_restore':
     need_admin();
@@ -260,7 +311,7 @@ case 'admin_restore':
     with_db(function (&$db) use ($id, $a) {
         foreach ($db['codes'] as $i => &$c) {
             if ($c['id'] !== $id) continue;
-            if ($a === 'admin_delete') array_splice($db['codes'], $i, 1);
+            if ($a === 'admin_delete') { if (!empty($c['file'])) @unlink(PDF_DIR . '/' . basename($c['file'])); array_splice($db['codes'], $i, 1); }
             else { $c['taken'] = false; $c['takenBy'] = null; $c['takenAt'] = null; unset($c['price'], $c['paid'], $c['paidAt']); }
             return [null, true];
         }
