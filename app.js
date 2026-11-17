@@ -8,6 +8,12 @@
       confirm: `Valable pour une séance standard. Tout supplément (3D, IMAX, 4DX…) est à régler en plus sur place.`,
       cond: `Valable pour une séance standard, hors séances spéciales. Tout supplément (3D, IMAX, IMAX 3D, fauteuil premium, D-Box et prestations complémentaires) est à régler en plus sur place.` }
   };
+  // Programmes des cinémas de Rennes (affichés sous les boutons de réservation)
+  const CINE_LINKS = [
+    { name: "Pathé Rennes", url: "https://www.pathe.fr/cinemas/cinema-pathe-rennes" },
+    { name: "Arvor",        url: "https://www.cinema-arvor.fr/seances/" },
+    { name: "TNB",          url: "https://www.t-n-b.fr/programmation?subsections=cinema" },
+  ];
   function setCond(el, type){ const T = TYPES[type]; el.innerHTML = T ? T.cond : ""; el.style.display = T ? "" : "none"; el.classList.toggle("pathe", type === "pathe"); }
 
   const $ = id => document.getElementById(id);
@@ -40,6 +46,8 @@
   const initials = n => (n.trim().split(/\s+/).map(w=>w[0]).join("").slice(0,2) || "?").toUpperCase();
   const avatarHtml = (i, n) => { const [fg,bg]=COLORS[i%COLORS.length]; return `<div class="avatar" style="color:${fg};background:${bg}">${esc(initials(n))}</div>`; };
   const pdfUrl = (id, dl) => window.CC_PDF_URL ? window.CC_PDF_URL(id, dl) : "api.php?a=pdf&id=" + encodeURIComponent(id) + (dl ? "&dl=1" : "");
+  const dfr = d => d ? new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { day:"numeric", month:"short", year:"numeric" }) : "";
+  const daysLeft = (d, today) => Math.round((new Date(d + "T12:00:00") - new Date((today || new Date().toISOString().slice(0,10)) + "T12:00:00")) / 86400000);
   const eur = v => (Math.round((v||0)*100)/100).toLocaleString("fr-FR",{style:"currency",currency:"EUR"});
   const fmt = ts => ts ? new Date(ts).toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}) + " " + new Date(ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "";
 
@@ -166,7 +174,7 @@
 
     $("hist").innerHTML = mine.length ? mine.map((c,k) => {
       const T = TYPES[c.type] || {label:c.type,color:"var(--muted)"};
-      return `<div class="hrow" data-k="${k}" role="button" tabindex="0"><span class="dot" style="background:${T.color}"></span><span class="k">${c.file ? "📄 " : ""}${esc(c.code)}</span><span class="t">${esc(T.label)} · ${eur(c.price)} · ${fmt(c.takenAt)}</span>${c.paid
+      return `<div class="hrow" data-k="${k}" role="button" tabindex="0"><span class="dot" style="background:${T.color}"></span><span class="k">${c.file ? "📄 " : ""}${esc(c.code)}</span><span class="t">${esc(T.label)} · ${eur(c.price)} · ${fmt(c.takenAt)}${c.expires ? ` · <span class="exp ${daysLeft(c.expires) < 0 ? "gone" : daysLeft(c.expires) <= 14 ? "soon" : ""}">valable jusqu'au ${dfr(c.expires)}</span>` : ""}</span>${c.paid
         ? `<button class="badge ok" data-undo="${esc(c.id)}" title="Annuler">Remboursé ✓</button>`
         : `<button class="paybtn" data-pay="${esc(c.id)}">J'ai remboursé</button>`}</div>`;
     }).join("") : `<div class="empty">Aucune place réservée pour l'instant.</div>`;
@@ -180,6 +188,8 @@
       myPaid({ id: b.dataset.undo, paid: false }, b);
     });
     $("payAll").style.display = due.length > 1 ? "" : "none";
+
+    $("lkList").innerHTML = CINE_LINKS.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.name)} <span class="ar">↗</span></a>`).join("");
   }
 
   async function claim(type){
@@ -251,7 +261,8 @@
       $("mOpen").href = pdfUrl(c.id, false);
       $("mDl").href = pdfUrl(c.id, true);
     }
-    $("mMeta").textContent = "Récupéré par " + (c.takenBy || profile) + (c.takenAt ? " · " + fmt(c.takenAt) : "");
+    $("mMeta").innerHTML = esc("Récupéré par " + (c.takenBy || profile) + (c.takenAt ? " · " + fmt(c.takenAt) : ""))
+      + (c.expires ? `<br><span class="exp ${daysLeft(c.expires) <= 14 ? "soon" : ""}" style="font-size:12px">Valable jusqu'au ${dfr(c.expires)}</span>` : "");
     $("mCopy").textContent = "Copier";
     $("codeOv").classList.add("on");
   }
@@ -274,7 +285,10 @@
   }
   async function loadAdmin(){
     const r = await api("admin_state");
-    admCodes = r.codes; profilesList = r.profiles; admPay = r.pay;
+    admCodes = r.codes; profilesList = r.profiles; admPay = r.pay; admToday = r.today;
+    const site = r.site || { email:"", links:[] };
+    if (document.activeElement !== $("alertEmail")) $("alertEmail").value = site.email || "";
+    renderAlerts();
     if (document.activeElement === null || !document.activeElement.closest || !document.activeElement.closest(".pgrid")) {
       $("pCC").value = String(admPay.price.cinecheque).replace(".", ","); $("pPA").value = String(admPay.price.pathe).replace(".", ",");
       $("fCCp").value = String(admPay.full.cinecheque).replace(".", ","); $("fPAp").value = String(admPay.full.pathe).replace(".", ",");
@@ -286,7 +300,34 @@
     renderLog();
   }
 
-  let admPay = null;
+  let admPay = null, admToday = null;
+  function renderAlerts(){
+    const out = [];
+    ["cinecheque","pathe"].forEach(t => {
+      const av = admCodes.filter(c => c.type === t && !c.taken && !(c.expires && daysLeft(c.expires, admToday) < 0));
+      if (av.length <= 1) out.push([av.length ? "" : "red", av.length ? `Plus qu'une place ${TYPES[t].label} en stock.` : `Plus aucune place ${TYPES[t].label} en stock.`]);
+      const soon = av.filter(c => c.expires && daysLeft(c.expires, admToday) <= 14);
+      if (soon.length) out.push(["", `${soon.length} place${soon.length>1?"s":""} ${TYPES[t].label} expire${soon.length>1?"nt":""} dans moins de 15 jours.`]);
+      const gone = admCodes.filter(c => c.type === t && !c.taken && c.expires && daysLeft(c.expires, admToday) < 0);
+      if (gone.length) out.push(["red", `${gone.length} place${gone.length>1?"s":""} ${TYPES[t].label} expirée${gone.length>1?"s":""} (plus proposée${gone.length>1?"s":""}).`]);
+    });
+    $("admAlerts").innerHTML = out.map(([cls, txt]) => `<div class="${cls}">⚠︎ ${esc(txt)}</div>`).join("");
+  }
+  $("siteSave").onclick = async () => {
+    try {
+      await api("admin_site_settings", { email: $("alertEmail").value.trim(), links: [] });
+      $("siteOk").style.color = ""; $("siteOk").textContent = "Enregistré ✓";
+      await loadAdmin();
+    } catch(e){ $("siteOk").style.color = "var(--red)"; $("siteOk").textContent = e.error || "Erreur"; }
+  };
+  $("testMail").onclick = async () => {
+    $("siteOk").style.color = ""; $("siteOk").textContent = "Envoi du test…";
+    try {
+      await api("admin_site_settings", { email: $("alertEmail").value.trim(), links: [] });
+      await api("admin_test_mail");
+      $("siteOk").textContent = "E-mail de test envoyé ✓ (pensez à regarder dans les spams)";
+    } catch(e){ $("siteOk").style.color = "var(--red)"; $("siteOk").textContent = e.error || "Erreur"; }
+  };
   function renderBal(){
     const per = {};
     admCodes.filter(c => c.taken && !c.paid).forEach(c => { per[c.takenBy] = (per[c.takenBy] || 0) + (c.price || 0); });
@@ -350,7 +391,7 @@
     let ok = 0, dup = 0, err = [];
     for (let i = 0; i < files.length; i++) {
       $("addOk").style.color = ""; $("addOk").textContent = `Envoi ${i+1}/${files.length}… ${files[i].name}`;
-      const fd = new FormData(); fd.append("type", addType); fd.append("file", files[i]);
+      const fd = new FormData(); fd.append("type", addType); fd.append("expires", $("addExp").value || ""); fd.append("file", files[i]);
       try {
         const r = await fetch("api.php?a=admin_upload", { method: "POST", body: fd, credentials: "same-origin" });
         let d = {}; try { d = await r.json(); } catch(e){ d = { error: "réponse invalide (fichier trop gros ?)" }; }
@@ -376,7 +417,7 @@
     if (!lines.length) { $("addOk").textContent = "Collez au moins un code."; return; }
     $("addBtn").disabled = true;
     try {
-      const r = await api("admin_add", { type: addType, codes: lines });
+      const r = await api("admin_add", { type: addType, codes: lines, expires: $("addExp").value || "" });
       $("addCodes").value = "";
       $("addOk").textContent = r.added ? `${r.added} code(s) ajouté(s) ✓` : "Ces codes existent déjà.";
       await loadAdmin(); await refresh();
@@ -395,11 +436,18 @@
   };
 
   function renderStock(){
-    const list = admCodes.filter(c=>c.type===stockType).sort((a,b)=> (a.taken===b.taken) ? (a.addedAt||0)-(b.addedAt||0) : (a.taken?1:-1));
-    $("stock").innerHTML = list.length ? list.map(c=>`<div class="srow"><span class="dot" style="background:${c.taken?"var(--dim)":"#3dd68c"}"></span><span class="k" style="${c.taken?"color:var(--dim);text-decoration:line-through":""}">${c.file?"📄 ":""}${esc(c.code)}</span>${c.file?`<a class="x" href="${pdfUrl(c.id,false)}" target="_blank" rel="noopener" title="Voir le PDF">👁</a>`:""}<span class="s">${c.taken?esc(c.takenBy||"pris"):"dispo"}</span>${c.taken?`<button class="x" data-r="${esc(c.id)}" title="Remettre en stock">↺</button>`:""}<button class="x" data-d="${esc(c.id)}" title="Supprimer">✕</button></div>`).join("")
-      : `<div class="empty">Aucun code.</div>`;
+    const st = c => c.taken ? 2 : (c.expires && daysLeft(c.expires, admToday) < 0 ? 1 : 0);
+    const list = admCodes.filter(c=>c.type===stockType).sort((a,b)=> st(a)-st(b) || ((a.expires||"9999")<(b.expires||"9999")?-1:(a.expires||"9999")>(b.expires||"9999")?1:0) || (a.addedAt||0)-(b.addedAt||0));
+    $("stock").innerHTML = list.length ? list.map(c=>{
+      const s2 = st(c);
+      const dot = s2===2 ? "var(--dim)" : s2===1 ? "var(--red)" : "#3dd68c";
+      const right = s2===2 ? `<span class="s">${esc(c.takenBy||"pris")}</span><button class="x" data-r="${esc(c.id)}" title="Remettre en stock">↺</button>`
+        : `<input type="date" data-exp="${esc(c.id)}" value="${esc(c.expires||"")}" title="Valable jusqu'au (facultatif)">`;
+      return `<div class="srow"><span class="dot" style="background:${dot}"></span><span class="k" style="${s2===2?"color:var(--dim);text-decoration:line-through":s2===1?"color:var(--red)":""}">${c.file?"📄 ":""}${esc(c.code)}</span>${s2===1?`<span class="exp gone">expirée</span>`:""}${c.file?`<a class="x" href="${pdfUrl(c.id,false)}" target="_blank" rel="noopener" title="Voir le PDF">👁</a>`:""}${right}<button class="x" data-d="${esc(c.id)}" title="Supprimer">✕</button></div>`;
+    }).join("") : `<div class="empty">Aucune place.</div>`;
     $("stock").querySelectorAll("[data-d]").forEach(b => b.onclick = async () => { try{ await api("admin_delete",{id:b.dataset.d}); await loadAdmin(); await refresh(); }catch(e){ toast(e.error||"Erreur"); } });
     $("stock").querySelectorAll("[data-r]").forEach(b => b.onclick = async () => { try{ await api("admin_restore",{id:b.dataset.r}); await loadAdmin(); await refresh(); }catch(e){ toast(e.error||"Erreur"); } });
+    $("stock").querySelectorAll("[data-exp]").forEach(inp => inp.onchange = async () => { try{ await api("admin_set_expiry",{id:inp.dataset.exp, expires:inp.value}); toast(inp.value ? "Date enregistrée ✓" : "Date retirée"); await loadAdmin(); await refresh(); }catch(e){ toast(e.error||"Erreur"); } });
   }
 
   document.addEventListener("keydown", e => { if (e.key === "Escape") { closeConfirm(); $("infoOv").classList.remove("on"); $("filmOv").classList.remove("on"); $("codeOv").classList.remove("on"); $("admOv").classList.remove("on"); } });

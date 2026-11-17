@@ -17,6 +17,7 @@ const DB_GUARD = "<?php exit; ?>\n";
 const TYPES = ['cinecheque', 'pathe'];
 const PDF_DIR = __DIR__ . '/data/pdf';
 const PDF_MAX = 15 * 1024 * 1024; // 15 Mo
+date_default_timezone_set('Europe/Paris');
 
 function out($data, $status = 200) {
     http_response_code($status);
@@ -58,6 +59,32 @@ function pay_settings($db) {
 }
 /** Prix d'un code pris : celui enregistré au moment de la réservation, sinon le prix actuel. */
 function code_price($c, $pay) { return isset($c['price']) ? (float)$c['price'] : $pay['price'][$c['type']]; }
+
+/** Date d'expiration (facultative) : une place expirée n'est plus proposée. */
+function clean_date($v) { $v = trim((string)$v); return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : null; }
+function is_expired($c) { return !empty($c['expires']) && $c['expires'] < date('Y-m-d'); }
+function is_available($c) { return !$c['taken'] && !is_expired($c); }
+function avail_count($db, $type) {
+    $n = 0;
+    foreach ($db['codes'] as $c) if ($c['type'] === $type && is_available($c)) $n++;
+    return $n;
+}
+
+/** Réglages du site : e-mail d'alerte et liens vers les programmes des cinémas. */
+function site_settings($db) {
+    $s = $db['site'] ?? [];
+    return ['email' => (string)($s['email'] ?? ''), 'links' => array_values($s['links'] ?? []), 'alertSent' => $s['alertSent'] ?? []];
+}
+/** L'alerte « dernière place » est envoyée une seule fois ; elle se réarme quand le stock repasse au-dessus d'une place. */
+function rearm_alerts(&$db) {
+    foreach (TYPES as $t) if (avail_count($db, $t) > 1) $db['site']['alertSent'][$t] = false;
+}
+function send_mail($to, $subject, $body) {
+    $host = preg_replace('/:\d+$/', '', preg_replace('/^www\./', '', $_SERVER['HTTP_HOST'] ?? 'localhost'));
+    $headers = "From: Cine Codes <noreply@$host>\r\nContent-Type: text/plain; charset=utf-8\r\n";
+    return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers);
+}
+const TYPE_LABELS = ['cinecheque' => 'CinéChèque', 'pathe' => 'Pathé'];
 
 function need_login() { if (empty($_SESSION['ok'])) out(['error' => 'auth'], 401); }
 function need_admin() { need_login(); if (empty($_SESSION['admin'])) out(['error' => 'admin'], 403); }
@@ -103,8 +130,8 @@ case 'state':
         $counts = array_fill_keys(TYPES, 0);
         $mine = [];
         foreach ($db['codes'] as $c) {
-            if (!$c['taken']) $counts[$c['type']]++;
-            elseif ($me !== null && $c['takenBy'] === $me) $mine[] = $c;
+            if (is_available($c)) $counts[$c['type']]++;
+            elseif ($c['taken'] && $me !== null && $c['takenBy'] === $me) $mine[] = $c;
         }
         usort($mine, function ($x, $y) { return $y['takenAt'] <=> $x['takenAt']; });
         $pay = pay_settings($db);
@@ -115,7 +142,8 @@ case 'state':
             $saved += max(0, $pay['full'][$m['type']] - $m['price']);
         }
         return [['counts' => $counts, 'mine' => $mine, 'profile' => $me, 'admin' => !empty($_SESSION['admin']),
-                 'owed' => round($owed, 2), 'saved' => round($saved, 2), 'pay' => $pay], false];
+                 'owed' => round($owed, 2), 'saved' => round($saved, 2), 'pay' => $pay,
+                 'links' => site_settings($db)['links']], false];
     }));
 
 case 'claim':
@@ -124,20 +152,38 @@ case 'claim':
     $type = $in['type'] ?? '';
     if (!$me) out(['error' => 'Choisissez un profil'], 400);
     if (!in_array($type, TYPES, true)) out(['error' => 'Type inconnu'], 400);
-    $code = with_db(function (&$db) use ($me, $type) {
-        foreach ($db['codes'] as &$c) {
-            if ($c['type'] === $type && !$c['taken']) {
-                $c['taken'] = true;
-                $c['takenBy'] = $me;
-                $c['takenAt'] = time() * 1000;
-                $c['price'] = pay_settings($db)['price'][$type];
-                $c['paid'] = false;
-                return [$c, true];
-            }
+    $alert = null;
+    $code = with_db(function (&$db) use ($me, $type, &$alert) {
+        // On donne d'abord la place qui expire le plus tôt (sans date = en dernier), puis la plus ancienne.
+        $best = null;
+        foreach ($db['codes'] as $i => $c) {
+            if ($c['type'] !== $type || !is_available($c)) continue;
+            $key = [($c['expires'] ?? '') ?: '9999-12-31', $c['addedAt'] ?? 0];
+            if ($best === null || $key < $best[0]) $best = [$key, $i];
         }
-        return [null, false];
+        if ($best === null) return [null, false];
+        $c = &$db['codes'][$best[1]];
+        $c['taken'] = true;
+        $c['takenBy'] = $me;
+        $c['takenAt'] = time() * 1000;
+        $c['price'] = pay_settings($db)['price'][$type];
+        $c['paid'] = false;
+        $taken = $c;
+        $site = site_settings($db);
+        $left = avail_count($db, $type);
+        if ($left <= 1 && $site['email'] !== '' && empty($site['alertSent'][$type])) {
+            $db['site']['alertSent'][$type] = true;
+            $alert = [$site['email'], $left];
+        }
+        return [$taken, true];
     });
     if (!$code) out(['error' => 'Plus de place disponible'], 409);
+    if ($alert) {
+        [$to, $left] = $alert;
+        $label = TYPE_LABELS[$type];
+        $msg = $left === 1 ? "Il ne reste plus qu'une seule place $label sur Ciné Codes." : "Il n'y a plus aucune place $label sur Ciné Codes.";
+        send_mail($to, "Ciné Codes : plus qu'une place $label", "$msg\n\nDernière place prise par : $me.\n\nPense à en racheter si besoin 🙂\n\n(Ce message n'est envoyé qu'une fois, jusqu'au prochain réapprovisionnement.)");
+    }
     out(['code' => $code]);
 
 case 'my_paid':
@@ -248,7 +294,8 @@ case 'admin_state':
         $pay = pay_settings($db);
         $codes = $db['codes'];
         foreach ($codes as &$c) if ($c['taken']) $c['price'] = code_price($c, $pay);
-        return [['codes' => $codes, 'profiles' => $db['profiles'], 'pay' => $pay], false];
+        $site = site_settings($db);
+        return [['codes' => $codes, 'profiles' => $db['profiles'], 'pay' => $pay, 'site' => $site, 'today' => date('Y-m-d')], false];
     }));
 
 case 'admin_paid':      // marque comme réglés tous les codes d'un profil
@@ -280,12 +327,51 @@ case 'admin_pay_settings':
     });
     out(['ok' => true]);
 
+case 'admin_site_settings':
+    need_admin();
+    $email = trim((string)($in['email'] ?? ''));
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) out(['error' => 'Adresse e-mail invalide'], 400);
+    $links = [];
+    foreach (($in['links'] ?? []) as $l) {
+        $name = mb_substr(trim((string)($l['name'] ?? '')), 0, 40);
+        $url = trim((string)($l['url'] ?? ''));
+        if ($name === '' && $url === '') continue;
+        if ($name === '' || !preg_match('#^https?://#i', $url) || !filter_var($url, FILTER_VALIDATE_URL)) out(['error' => "Lien invalide : « $name » (l'adresse doit commencer par https://)"], 400);
+        $links[] = ['name' => $name, 'url' => $url];
+        if (count($links) >= 12) break;
+    }
+    with_db(function (&$db) use ($email, $links) {
+        $db['site']['email'] = $email;
+        $db['site']['links'] = $links;
+        return [null, true];
+    });
+    out(['ok' => true]);
+
+case 'admin_test_mail':
+    need_admin();
+    $email = with_db(function (&$db) { return [site_settings($db)['email'], false]; });
+    if ($email === '') out(['error' => "Enregistrez d'abord une adresse e-mail"], 400);
+    $ok = send_mail($email, 'Ciné Codes : e-mail de test', "Si vous lisez ce message, les alertes « dernière place » de Ciné Codes fonctionnent 🎟️");
+    out($ok ? ['ok' => true] : ['error' => "Le serveur n'a pas pu envoyer l'e-mail"], $ok ? 200 : 500);
+
+case 'admin_set_expiry':
+    need_admin();
+    $id = $in['id'] ?? '';
+    $exp = clean_date($in['expires'] ?? '');
+    with_db(function (&$db) use ($id, $exp) {
+        foreach ($db['codes'] as &$c) if ($c['id'] === $id) { $c['expires'] = $exp; break; }
+        rearm_alerts($db);
+        return [null, true];
+    });
+    out(['ok' => true]);
+
 case 'admin_add':
     need_admin();
     $type = $in['type'] ?? '';
     $list = $in['codes'] ?? [];
     if (!in_array($type, TYPES, true) || !is_array($list)) out(['error' => 'Requête invalide'], 400);
-    $added = with_db(function (&$db) use ($type, $list) {
+    $exp = clean_date($in['expires'] ?? '');
+    $added = with_db(function (&$db) use ($type, $list, $exp) {
         $seen = [];
         foreach ($db['codes'] as $c) $seen[$c['type'] . '|' . $c['code']] = true;
         $n = 0;
@@ -294,10 +380,11 @@ case 'admin_add':
             $code = trim((string)$code);
             if ($code === '' || mb_strlen($code) > 200 || isset($seen[$type . '|' . $code])) continue;
             $seen[$type . '|' . $code] = true;
-            $db['codes'][] = ['id' => bin2hex(random_bytes(6)), 'type' => $type, 'code' => $code,
+            $db['codes'][] = ['id' => bin2hex(random_bytes(6)), 'type' => $type, 'code' => $code, 'expires' => $exp,
                               'taken' => false, 'takenBy' => null, 'takenAt' => null, 'addedAt' => $t + $n];
             $n++;
         }
+        rearm_alerts($db);
         return [$n, $n > 0];
     });
     out(['added' => $added]);
@@ -313,12 +400,14 @@ case 'admin_upload':
     if (!is_dir(PDF_DIR)) @mkdir(PDF_DIR, 0755, true);
     $hash = sha1_file($f['tmp_name']);
     $label = mb_substr(preg_replace('/\.pdf$/i', '', basename($f['name'])), 0, 120);
-    $res = with_db(function (&$db) use ($type, $f, $hash, $label) {
+    $exp = clean_date($_POST['expires'] ?? '');
+    $res = with_db(function (&$db) use ($type, $f, $hash, $label, $exp) {
         foreach ($db['codes'] as $c) if (($c['hash'] ?? null) === $hash) return [['dup' => true], false];
         $id = bin2hex(random_bytes(8));
         if (!move_uploaded_file($f['tmp_name'], PDF_DIR . "/$id.pdf")) return [['error' => "Impossible d'enregistrer le PDF (dossier data/)"], false];
-        $db['codes'][] = ['id' => $id, 'type' => $type, 'code' => $label, 'file' => "$id.pdf", 'hash' => $hash,
+        $db['codes'][] = ['id' => $id, 'type' => $type, 'code' => $label, 'file' => "$id.pdf", 'hash' => $hash, 'expires' => $exp,
                           'taken' => false, 'takenBy' => null, 'takenAt' => null, 'addedAt' => (int)(microtime(true) * 1000)];
+        rearm_alerts($db);
         return [['ok' => true], true];
     });
     if (isset($res['error'])) out($res, 500);
@@ -332,7 +421,7 @@ case 'admin_restore':
         foreach ($db['codes'] as $i => &$c) {
             if ($c['id'] !== $id) continue;
             if ($a === 'admin_delete') { if (!empty($c['file'])) @unlink(PDF_DIR . '/' . basename($c['file'])); array_splice($db['codes'], $i, 1); }
-            else { $c['taken'] = false; $c['takenBy'] = null; $c['takenAt'] = null; unset($c['price'], $c['paid'], $c['paidAt']); }
+            else { $c['taken'] = false; $c['takenBy'] = null; $c['takenAt'] = null; unset($c['price'], $c['paid'], $c['paidAt']); rearm_alerts($db); }
             return [null, true];
         }
         return [null, false];
