@@ -1,6 +1,12 @@
 <?php
 // Ciné Codes — API (PHP 7.4+). Aucune base de données nécessaire.
 session_start();
+if (!is_file(__DIR__ . '/config.php')) {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(500);
+    echo json_encode(['error' => 'config.php manquant : copiez config.example.php en config.php']);
+    exit;
+}
 require __DIR__ . '/config.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -38,6 +44,18 @@ function with_db(callable $fn) {
     fclose($fp);
     return $result;
 }
+
+/** Réglages de paiement (prix, numéro Wero), avec valeurs par défaut. */
+function pay_settings($db) {
+    $p = $db['pay'] ?? [];
+    return [
+        'price' => ['cinecheque' => (float)($p['price']['cinecheque'] ?? 3.80), 'pathe' => (float)($p['price']['pathe'] ?? 6.90)],
+        'full'  => ['cinecheque' => (float)($p['full']['cinecheque'] ?? 9.95), 'pathe' => (float)($p['full']['pathe'] ?? 16.50)],
+        'phone' => (string)($p['phone'] ?? ''),
+    ];
+}
+/** Prix d'un code pris : celui enregistré au moment de la réservation, sinon le prix actuel. */
+function code_price($c, $pay) { return isset($c['price']) ? (float)$c['price'] : $pay['price'][$c['type']]; }
 
 function need_login() { if (empty($_SESSION['ok'])) out(['error' => 'auth'], 401); }
 function need_admin() { need_login(); if (empty($_SESSION['admin'])) out(['error' => 'admin'], 403); }
@@ -87,7 +105,15 @@ case 'state':
             elseif ($me !== null && $c['takenBy'] === $me) $mine[] = $c;
         }
         usort($mine, function ($x, $y) { return $y['takenAt'] <=> $x['takenAt']; });
-        return [['counts' => $counts, 'mine' => $mine, 'profile' => $me, 'admin' => !empty($_SESSION['admin'])], false];
+        $pay = pay_settings($db);
+        $owed = 0; $saved = 0;
+        foreach ($mine as &$m) {
+            $m['price'] = code_price($m, $pay);
+            if (empty($m['paid'])) $owed += $m['price'];
+            $saved += max(0, $pay['full'][$m['type']] - $m['price']);
+        }
+        return [['counts' => $counts, 'mine' => $mine, 'profile' => $me, 'admin' => !empty($_SESSION['admin']),
+                 'owed' => round($owed, 2), 'saved' => round($saved, 2), 'pay' => $pay], false];
     }));
 
 case 'claim':
@@ -102,6 +128,8 @@ case 'claim':
                 $c['taken'] = true;
                 $c['takenBy'] = $me;
                 $c['takenAt'] = time() * 1000;
+                $c['price'] = pay_settings($db)['price'][$type];
+                $c['paid'] = false;
                 return [$c, true];
             }
         }
@@ -167,7 +195,41 @@ case 'admin_login':
 
 case 'admin_state':
     need_admin();
-    out(with_db(function (&$db) { return [['codes' => $db['codes'], 'profiles' => $db['profiles']], false]; }));
+    out(with_db(function (&$db) {
+        $pay = pay_settings($db);
+        $codes = $db['codes'];
+        foreach ($codes as &$c) if ($c['taken']) $c['price'] = code_price($c, $pay);
+        return [['codes' => $codes, 'profiles' => $db['profiles'], 'pay' => $pay], false];
+    }));
+
+case 'admin_paid':      // marque comme réglés tous les codes d'un profil
+case 'admin_toggle_paid': // inverse l'état « réglé » d'un code
+    need_admin();
+    $profile = $in['profile'] ?? null;
+    $id = $in['id'] ?? null;
+    with_db(function (&$db) use ($a, $profile, $id) {
+        $now = time() * 1000;
+        foreach ($db['codes'] as &$c) {
+            if (!$c['taken']) continue;
+            if ($a === 'admin_paid' && $c['takenBy'] === $profile && empty($c['paid'])) { $c['paid'] = true; $c['paidAt'] = $now; }
+            if ($a === 'admin_toggle_paid' && $c['id'] === $id) { $c['paid'] = empty($c['paid']); $c['paidAt'] = $c['paid'] ? $now : null; }
+        }
+        return [null, true];
+    });
+    out(['ok' => true]);
+
+case 'admin_pay_settings':
+    need_admin();
+    $num = function ($v) { $v = (float)str_replace(',', '.', (string)$v); return ($v >= 0 && $v < 1000) ? round($v, 2) : null; };
+    $price = ['cinecheque' => $num($in['price']['cinecheque'] ?? ''), 'pathe' => $num($in['price']['pathe'] ?? '')];
+    $full  = ['cinecheque' => $num($in['full']['cinecheque'] ?? ''),  'pathe' => $num($in['full']['pathe'] ?? '')];
+    if (in_array(null, $price, true) || in_array(null, $full, true)) out(['error' => 'Prix invalides'], 400);
+    $phone = mb_substr(trim((string)($in['phone'] ?? '')), 0, 30);
+    with_db(function (&$db) use ($price, $full, $phone) {
+        $db['pay'] = ['price' => $price, 'full' => $full, 'phone' => $phone];
+        return [null, true];
+    });
+    out(['ok' => true]);
 
 case 'admin_add':
     need_admin();
@@ -199,7 +261,7 @@ case 'admin_restore':
         foreach ($db['codes'] as $i => &$c) {
             if ($c['id'] !== $id) continue;
             if ($a === 'admin_delete') array_splice($db['codes'], $i, 1);
-            else { $c['taken'] = false; $c['takenBy'] = null; $c['takenAt'] = null; }
+            else { $c['taken'] = false; $c['takenBy'] = null; $c['takenAt'] = null; unset($c['price'], $c['paid'], $c['paidAt']); }
             return [null, true];
         }
         return [null, false];

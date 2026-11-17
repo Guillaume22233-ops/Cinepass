@@ -179,6 +179,78 @@
   .mbtns{display:flex;gap:10px}
   .mbtns .btn{flex:1}
 
+  /* Prix & solde */
+  .tprice{display:flex;align-items:baseline;gap:8px;margin-top:10px;font-size:14px}
+  .tprice b{font-weight:700}
+  .tprice s{color:var(--dim);font-size:13px}
+  .tprice .save{font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;background:rgba(61,214,140,.12);color:#3dd68c}
+  .wallet{display:grid;grid-template-columns:1.2fr 1fr;gap:12px}
+  @media(max-width:640px){.wallet{grid-template-columns:1fr}}
+  .wcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+  .wlab{font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+  .wamt{font-family:"Bebas Neue",sans-serif;font-size:52px;line-height:1;margin:8px 0 6px}
+  .wamt.zero{color:#3dd68c}
+  .wsub{font-size:13px;color:var(--muted)}
+  .wsub b{color:#3dd68c;font-weight:600}
+  .wero{display:flex;flex-direction:column;gap:10px;justify-content:center}
+  .wnum{font-family:"JetBrains Mono",monospace;font-size:22px;font-weight:700;letter-spacing:.06em}
+  .whint{font-size:12px;color:var(--dim)}
+  .badge{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:6px;white-space:nowrap}
+  .badge.due{background:rgba(229,72,77,.12);color:var(--red)}
+  .badge.ok{background:rgba(61,214,140,.12);color:#3dd68c}
+  button.badge{cursor:pointer}
+  .bal{display:flex;flex-direction:column;gap:6px}
+  .brow{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:10px;font-size:14px}
+  .brow .n{flex:1;font-weight:600}
+  .brow .v{font-family:"JetBrains Mono",monospace;font-weight:700}
+  .brow .v.zero{color:var(--dim);font-weight:500}
+  .pgrid{display:grid;grid-template-columns:auto 1fr 1fr;gap:8px;align-items:center;font-size:13px}
+  .pgrid span{color:var(--muted)}
+  .pgrid .h{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+
+  /* PDF */
+  .pdfbox{margin:18px 0 8px;padding:22px 16px;border-radius:14px;background:#000;border:1px dashed var(--line2);display:flex;flex-direction:column;align-items:center;gap:10px}
+  .pdfbox .ic{width:54px;height:64px;border-radius:8px;background:var(--panel2);border:1px solid var(--line2);display:grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--red);position:relative}
+  .pdfbox .nm{font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--muted);word-break:break-all}
+  .pdfbtns{display:flex;gap:8px;width:100%}
+  .pdfbtns a{flex:1;text-decoration:none;text-align:center}
+  .drop{display:flex;flex-direction:column;align-items:center;gap:4px;padding:22px 14px;border:1.5px dashed var(--line2);border-radius:12px;background:var(--bg);cursor:pointer;text-align:center;transition:border-color .2s,background .2s}
+  .drop:hover,.drop.over{border-color:var(--gold);background:var(--gold-soft)}
+  .panel label.drop{display:flex;text-transform:none;letter-spacing:0;font-size:inherit;color:var(--text);font-weight:400;margin-bottom:0}
+  .drop span{font-size:14px}
+  .drop u{color:var(--gold);text-decoration:none;font-weight:600}
+  .drop small{color:var(--dim);font-size:12px}
+  details.alt summary{cursor:pointer;color:var(--muted);font-size:13px;margin-top:4px}
+  details.alt[open] summary{margin-bottom:8px}
+  .srow a.x{text-decoration:none}
+
+  /* Conditions */
+  .cond{text-align:left;font-size:12.5px;line-height:1.55;color:#c9c9cf;background:var(--bg);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:10px;padding:11px 13px;margin:14px 0}
+  .cond.pathe{border-left-color:var(--amber)}
+  .cond a{color:var(--text);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
+  .cond .city{display:flex;align-items:center;gap:6px;margin-top:8px;font-weight:600;color:var(--text)}
+  .cinfo{align-self:flex-start;font-size:12px;color:var(--muted);padding:2px 0;margin-top:6px;border-bottom:1px dotted var(--dim)}
+  .cinfo:hover{color:var(--text)}
+
+  /* Confirmation */
+  .cmodal .cicon{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;margin:0 auto 14px;font-size:24px}
+  .cmodal h4{font-family:"Bebas Neue",sans-serif;font-weight:400;font-size:30px;letter-spacing:.04em;line-height:1.05;margin-bottom:10px}
+  .cmodal p{color:#c9c9cf;font-size:14px;margin-bottom:6px}
+  .cmodal .warn{color:var(--muted);font-size:12px;margin-bottom:22px}
+  .cmodal #cOk{color:#0a0a0a}
+
+  /* Historique */
+  .sum{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .chip{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--line);font-size:12px;color:var(--muted)}
+  .chip.on{border-color:var(--text);color:var(--text)}
+  .chip b{color:var(--text);font-weight:600}
+  .hlog{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto}
+  .lrow{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;font-size:13px;padding:9px 10px;background:var(--bg);border-radius:8px}
+  .lrow .who2{font-weight:600}
+  .lrow .k{font-family:"JetBrains Mono",monospace;color:var(--muted);grid-column:1 / 3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  .lrow .d{color:var(--dim);font-size:12px;text-align:right}
+  .lrow .ty{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+
   /* Admin */
   .panel{width:100%;max-width:560px;max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:20px;padding:24px;text-align:left}
   .panel h2{margin-bottom:4px}
@@ -238,7 +310,7 @@
       </div>
     </header>
 
-    <div class="hello"><h2 id="helloT"></h2><p>Choisissez votre type de place. Un code récupéré disparaît pour tout le monde.</p></div>
+    <div class="hello"><h2 id="helloT"></h2><p>Choisissez votre type de place. Une place réservée disparaît pour tout le monde.</p></div>
 
     <div class="films" id="films" style="display:none">
       <div class="fhead"><h3>À l'affiche en France</h3><span>Données TMDB</span></div>
@@ -248,34 +320,87 @@
     <div class="grid">
       <div class="ticket cc">
         <div class="glow"></div>
-        <div><div class="tname">CinéChèque</div><div class="tsub">Valable dans les cinémas partenaires</div></div>
+        <div><div class="tname">CinéChèque</div><div class="tsub">E-billet · à Rennes : TNB et Arvor</div><div class="tprice" id="ccPrice"></div><button class="cinfo" data-t="cinecheque">ⓘ Conditions et cinémas</button></div>
         <div class="count"><b id="ccN">–</b><span>disponible(s)</span></div>
         <div class="perf"></div>
-        <button class="take" id="ccBtn" disabled>Prendre un code</button>
+        <button class="take" id="ccBtn" disabled>Prendre une place</button>
       </div>
       <div class="ticket pa">
         <div class="glow"></div>
-        <div><div class="tname">Pathé</div><div class="tsub">Valable dans les cinémas Pathé</div></div>
+        <div><div class="tname">Pathé</div><div class="tsub">Séance standard, hors suppléments</div><div class="tprice" id="paPrice"></div><button class="cinfo" data-t="pathe">ⓘ Conditions</button></div>
         <div class="count"><b id="paN">–</b><span>disponible(s)</span></div>
         <div class="perf"></div>
-        <button class="take" id="paBtn" disabled>Prendre un code</button>
+        <button class="take" id="paBtn" disabled>Prendre une place</button>
       </div>
     </div>
     <div class="status" id="status"></div>
 
     <div class="section">
-      <h3>Mes codes récupérés</h3>
+      <h3>Mon solde</h3>
+      <div class="wallet">
+        <div class="wcard">
+          <div class="wlab">À régler</div>
+          <div class="wamt" id="owed">–</div>
+          <div class="wsub" id="owedSub"></div>
+        </div>
+        <div class="wcard wero" id="weroBox" style="display:none">
+          <div class="wlab">Envoyer sur Wero</div>
+          <div class="wnum" id="weroNum"></div>
+          <div class="row" style="gap:8px">
+            <button class="btn small" id="weroCopy" style="flex:none">Copier le numéro</button>
+            <span class="whint">depuis l'appli de votre banque</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Mes places</h3>
       <div class="hist" id="hist"></div>
     </div>
   </div>
 </section>
 
 <!-- Pop-up code -->
+<!-- Conditions -->
+<div class="overlay" id="infoOv">
+  <div class="modal">
+    <div class="mk" id="iType"></div>
+    <div class="cond" id="iCond"></div>
+    <button class="btn ghost" id="iClose" style="width:100%">Fermer</button>
+  </div>
+</div>
+
+<!-- Confirmation -->
+<div class="overlay" id="confirmOv">
+  <div class="modal cmodal">
+    <div class="cicon" id="cIcon">🎟️</div>
+    <h4 id="cTitle"></h4>
+    <p id="cText"></p>
+    <p id="cPrice" style="margin-top:8px"></p>
+    <div class="cond" id="cCond"></div>
+    <div class="warn">La place disparaîtra pour les autres profils. Cette action est définitive.</div>
+    <div class="mbtns">
+      <button class="btn ghost" id="cCancel">Annuler</button>
+      <button class="btn" id="cOk">Oui, je réserve</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="codeOv">
   <div class="modal">
     <div class="mk" id="mType"></div>
     <div class="codebox" id="mCode"></div>
+    <div class="pdfbox" id="mPdf" style="display:none">
+      <div class="ic">PDF</div>
+      <div class="nm" id="mPdfName"></div>
+      <div class="pdfbtns">
+        <a class="btn small ghost" id="mOpen" target="_blank" rel="noopener">Ouvrir</a>
+        <a class="btn small" id="mDl">Télécharger</a>
+      </div>
+    </div>
     <div class="meta" id="mMeta"></div>
+    <div class="cond" id="mCond" style="margin-top:0"></div>
     <div class="mbtns">
       <button class="btn ghost" id="mClose">Fermer</button>
       <button class="btn" id="mCopy">Copier</button>
@@ -287,7 +412,7 @@
 <div class="overlay" id="admOv">
   <div class="panel">
     <div class="row" style="align-items:flex-start">
-      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de codes, profils et stock.</p></div>
+      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de places, soldes, profils et stock.</p></div>
       <button class="iconbtn" id="admClose" style="flex:none">✕</button>
     </div>
 
@@ -301,11 +426,26 @@
     </div>
     <div id="admBody">
     <div class="blk">
-      <label>Ajouter des codes</label>
+      <label>Soldes : ce qu'on vous doit</label>
+      <div class="bal" id="bal"></div>
+    </div>
+
+    <div class="blk">
+      <label>Ajouter des places</label>
       <div class="stack">
         <div class="seg" id="addType"><button data-t="cinecheque" class="on">CinéChèque</button><button data-t="pathe">Pathé</button></div>
-        <textarea id="addCodes" placeholder="Un code par ligne"></textarea>
-        <button class="btn small" id="addBtn">Ajouter</button>
+        <label class="drop" id="drop">
+          <input type="file" id="pdfIn" accept="application/pdf,.pdf" multiple hidden>
+          <span>Glissez vos PDF ici ou <u>choisissez des fichiers</u></span>
+          <small>1 PDF = 1 place · plusieurs fichiers à la fois possible</small>
+        </label>
+        <details class="alt">
+          <summary>ou ajouter des codes en texte</summary>
+          <div class="stack">
+            <textarea id="addCodes" placeholder="Un code par ligne"></textarea>
+            <button class="btn small" id="addBtn">Ajouter les codes</button>
+          </div>
+        </details>
         <div class="ok" id="addOk"></div>
       </div>
     </div>
@@ -315,6 +455,24 @@
       <div class="stack" id="profEdit"></div>
       <button class="btn small ghost" id="profSave" style="margin-top:10px;width:100%">Enregistrer les profils</button>
       <div class="ok" id="profOk"></div>
+    </div>
+
+    <div class="blk">
+      <label>Paiement</label>
+      <div class="pgrid">
+        <div></div><div class="h">Prix payé</div><div class="h">Prix normal</div>
+        <span>CinéChèque</span><input class="tin" id="pCC" inputmode="decimal"><input class="tin" id="fCCp" inputmode="decimal">
+        <span>Pathé</span><input class="tin" id="pPA" inputmode="decimal"><input class="tin" id="fPAp" inputmode="decimal">
+      </div>
+      <input class="tin" id="pPhone" placeholder="Numéro Wero (ex. 06 12 34 56 78)" style="margin-top:8px">
+      <button class="btn small ghost" id="paySave" style="margin-top:10px;width:100%">Enregistrer</button>
+      <div class="ok" id="payOk"></div>
+    </div>
+
+    <div class="blk">
+      <label>Historique : qui a pris quoi</label>
+      <div class="sum" id="sum"></div>
+      <div class="hlog" id="hlog"></div>
     </div>
 
     <div class="blk">
@@ -334,8 +492,8 @@
       <div class="fmeta" id="fMeta"></div>
       <div class="syn" id="fSyn"></div>
       <div class="fbtns">
-        <button id="fCC" style="background:var(--gold)">Code CinéChèque</button>
-        <button id="fPA" style="background:var(--amber)">Code Pathé</button>
+        <button id="fCC" style="background:var(--gold)">Place CinéChèque</button>
+        <button id="fPA" style="background:var(--amber)">Place Pathé</button>
       </div>
     </div>
   </div>
