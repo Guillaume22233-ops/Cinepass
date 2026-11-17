@@ -2,8 +2,10 @@
   const COLORS = [["#d9b45a","#2a2414"],["#f29a2e","#2b1d0e"],["#e5484d","#2b1213"],["#8e8cf0","#1b1a2e"],["#3dd68c","#0f2a1d"]];
   const TYPES = {
     cinecheque: { label:"CinéChèque", color:"var(--gold)",
+      confirm: `Liste des cinémas affiliés : <a href="https://www.reseauxdecines.com/loc/ecinecheque.html" target="_blank" rel="noopener">reseauxdecines.com/loc/ecinecheque.html</a>`,
       cond: `Ce e-billet CinéChèque est valable uniquement dans un réseau de cinémas spécifique, différent de celui du CinéChèque papier classique.<br>Liste des cinémas affiliés : <a href="https://www.reseauxdecines.com/loc/ecinecheque.html" target="_blank" rel="noopener">reseauxdecines.com/loc/ecinecheque.html</a><span class="city">📍 À Rennes : TNB et Arvor</span>` },
     pathe: { label:"Pathé", color:"var(--amber)",
+      confirm: `Valable pour une séance standard. Tout supplément (3D, IMAX, 4DX…) est à régler en plus sur place.`,
       cond: `Valable pour une séance standard, hors séances spéciales. Tout supplément (3D, IMAX, IMAX 3D, fauteuil premium, D-Box et prestations complémentaires) est à régler en plus sur place.` }
   };
   function setCond(el, type){ const T = TYPES[type]; el.innerHTML = T ? T.cond : ""; el.style.display = T ? "" : "none"; el.classList.toggle("pathe", type === "pathe"); }
@@ -199,11 +201,12 @@
     if (busy) return;
     pending = type;
     const T = TYPES[type];
-    $("cTitle").textContent = "Réserver une place " + T.label + "\u00a0?";
-    $("cText").innerHTML = "Une place " + esc(T.label) + " va être attribuée au profil <b>" + esc(profile) + "</b>" + (film ? " pour voir <b>" + esc(film) + "</b>" : "") + ".";
+    $("cTitle").textContent = "Réservation d'une place " + T.label;
     const pay = state && state.pay;
     $("cPrice").innerHTML = pay ? `Prix : <b>${eur(pay.price[type])}</b>` + (pay.full[type] > pay.price[type] ? ` <span style="color:var(--muted)">au lieu de ${eur(pay.full[type])} (prix standard)</span>` : "") : "";
-    setCond($("cCond"), type);
+    $("cCond").classList.toggle("pathe", type === "pathe");
+    $("cCond").innerHTML = `En cliquant sur « Oui, je réserve », la place sera attribuée à <b>${esc(profile)}</b>${film ? ` pour voir <b>${esc(film)}</b>` : ""}.`
+      + `<span style="display:block;margin-top:8px">${T.confirm}</span>`;
     $("cIcon").style.background = type === "pathe" ? "var(--amber-soft)" : "var(--gold-soft)";
     $("cOk").style.background = T.color;
     $("confirmOv").classList.add("on");
