@@ -309,7 +309,7 @@
   /* ---------- Gestion ---------- */
   let addType = "cinecheque", stockType = "cinecheque";
   function seg(id, cb){ $(id).querySelectorAll("button").forEach(b => b.onclick = () => { $(id).querySelectorAll("button").forEach(x=>x.classList.toggle("on", x===b)); cb(b.dataset.t); }); }
-  seg("addType", t => addType = t);
+  seg("addType", t => { addType = t; $("drop").dataset.t = t; $("dropType").textContent = TYPES[t].label; });
   seg("stockType", t => { stockType = t; renderStock(); });
 
   function admView(){
@@ -482,6 +482,11 @@
     $("stock").querySelectorAll("[data-r]").forEach(b => b.onclick = async () => { try{ await api("admin_restore",{id:b.dataset.r}); await loadAdmin(); await refresh(); }catch(e){ toast(e.error||"Erreur"); } });
     $("stock").querySelectorAll("[data-exp]").forEach(inp => inp.onchange = async () => { try{ await api("admin_set_expiry",{id:inp.dataset.exp, expires:inp.value}); toast(inp.value ? "Date enregistrée ✓" : "Date retirée"); await loadAdmin(); await refresh(); }catch(e){ toast(e.error||"Erreur"); } });
   }
+
+  // Met les nuages en pause pendant qu'une pop-up est ouverte (économise la batterie et fluidifie)
+  const syncModal = () => document.body.classList.toggle("modal-open", !!document.querySelector(".overlay.on"));
+  const mo = new MutationObserver(syncModal);
+  document.querySelectorAll(".overlay").forEach(o => mo.observe(o, { attributes: true, attributeFilter: ["class"] }));
 
   document.addEventListener("keydown", e => { if (e.key === "Escape") { closeConfirm(); $("infoOv").classList.remove("on"); $("filmOv").classList.remove("on"); $("codeOv").classList.remove("on"); $("admOv").classList.remove("on"); } });
 
