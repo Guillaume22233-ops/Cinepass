@@ -508,6 +508,27 @@ case 'admin_refresh_films':
     @unlink(__DIR__ . '/data/films.try');
     out(['ok' => true]);
 
+case 'admin_films_check':
+    // Diagnostic : le serveur arrive-t-il à récupérer une affiche chez TMDB ?
+    need_admin();
+    $cache = __DIR__ . '/data/films.php';
+    $list = is_file($cache) ? (json_decode(substr(file_get_contents($cache), strlen(DB_GUARD)), true) ?: []) : [];
+    $path = null;
+    foreach ($list as $f) if (!empty($f['poster']) && preg_match('#(/[A-Za-z0-9_\-]+\.(?:jpg|jpeg|png|webp))$#', $f['poster'], $m)) { $path = $m[1]; break; }
+    $res = ['films' => count($list), 'withPoster' => count(array_filter($list, function ($f) { return !empty($f['poster']); })),
+            'curl' => function_exists('curl_init'), 'cached' => count(glob(__DIR__ . '/data/posters/*') ?: [])];
+    if ($path && function_exists('curl_init')) {
+        $ch = curl_init('https://image.tmdb.org/t/p/w342' . $path);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_FOLLOWLOCATION => true]);
+        $img = curl_exec($ch);
+        $res['http'] = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $res['error'] = curl_error($ch);
+        $res['bytes'] = $img ? strlen($img) : 0;
+        curl_close($ch);
+        $res['writable'] = is_dir(__DIR__ . '/data/posters') ? is_writable(__DIR__ . '/data/posters') : is_writable(__DIR__ . '/data');
+    }
+    out($res);
+
 case 'admin_set_expiry':
     need_admin();
     $id = $in['id'] ?? '';

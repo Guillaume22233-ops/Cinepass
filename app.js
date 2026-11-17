@@ -417,7 +417,15 @@
       await api("admin_refresh_films");
       films = null; $("strip").innerHTML = ""; $("films").style.display = "none";
       await loadFilms();
-      $("filmsOk").textContent = (films && films.length) ? `${films.length} films à l'affiche ✓` : "Aucun film reçu (clé TMDB ?)";
+      let msg = (films && films.length) ? `${films.length} films à l'affiche ✓` : "Aucun film reçu (clé TMDB ?)";
+      try {
+        const d = await api("admin_films_check");
+        if (d.withPoster === 0) msg += " · TMDB n'a fourni aucune affiche.";
+        else if (!d.curl) msg += " · Problème : cURL indisponible sur le serveur.";
+        else if (d.http === 200 && d.bytes > 100) msg += d.writable === false ? " · Affiches OK chez TMDB, mais dossier data/posters non modifiable (permissions 755)." : ` · Affiches OK (serveur → TMDB : ${Math.round(d.bytes/1024)} Ko reçus, ${d.cached} en cache).`;
+        else msg += ` · Affiches : le serveur n'arrive pas à joindre TMDB (code ${d.http || "aucun"}${d.error ? ", " + d.error : ""}).`;
+      } catch(e){}
+      $("filmsOk").textContent = msg;
     } catch(e){ $("filmsOk").style.color = "var(--red)"; $("filmsOk").textContent = e.error || "Erreur"; }
   };
   $("testMail").onclick = async () => {

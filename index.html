@@ -82,8 +82,8 @@
   .fhead span{font-size:11px;color:var(--dim)}
   .strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 10px;margin:0 -2px;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
   .strip::-webkit-scrollbar{height:6px}.strip::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
-  .film{flex:none;width:118px;scroll-snap-align:start;text-align:left;display:flex;flex-direction:column;align-self:flex-start}
-  .poster{position:relative;aspect-ratio:2/3;border-radius:10px;background:#1a1a1f center/cover no-repeat;border:1px solid var(--line);overflow:hidden;transition:transform .2s,border-color .2s}
+  .film{flex:none;width:118px;scroll-snap-align:start;text-align:left;display:block;align-self:flex-start;padding:0}
+  .poster{position:relative;display:block;width:100%;height:177px;aspect-ratio:2/3;border-radius:10px;background:#1a1a1f center/cover no-repeat;border:1px solid var(--line);overflow:hidden;transition:transform .2s,border-color .2s}
   .film:hover .poster{transform:translateY(-3px);border-color:var(--line2)}
   .poster .pimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
   .poster .ph{position:absolute;inset:0;display:flex;align-items:flex-end;padding:10px;font-family:"Bebas Neue",sans-serif;font-size:20px;line-height:1.05;letter-spacing:.03em}
@@ -91,13 +91,13 @@
   .ftitle{font-size:13px;font-weight:500;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .fdate{font-size:11px;color:var(--muted)}
   .modal.fmodal{max-width:520px;text-align:left;display:flex;gap:18px}
-  .fmodal .poster{width:140px;flex:none;align-self:flex-start}
+  .fmodal .poster{width:140px;height:210px;flex:none;align-self:flex-start}
   .fmodal h4{font-family:"Bebas Neue",sans-serif;font-weight:400;font-size:30px;letter-spacing:.03em;line-height:1}
   .fmodal .fmeta{color:var(--muted);font-size:12px;margin:6px 0 10px}
   .fmodal .syn{font-size:13px;color:#c9c9cf;max-height:150px;overflow:auto;margin-bottom:16px}
   .fmodal .fbtns{display:flex;gap:8px;flex-wrap:wrap}
   .fmodal .fbtns button{flex:1;min-width:120px;padding:11px;border-radius:10px;font-weight:600;font-size:13px;color:#0a0a0a}
-  @media(max-width:520px){.modal.fmodal{flex-direction:column}.fmodal .poster{width:110px}}
+  @media(max-width:520px){.modal.fmodal{flex-direction:column}.fmodal .poster{width:110px;height:165px}}
 
   /* Profiles */
   #profiles{justify-content:center}
@@ -443,6 +443,13 @@
   .ang-msg span{display:inline-block;animation:gift 1s ease-in-out infinite}
   @keyframes gift{0%,100%{transform:rotate(0)}25%{transform:rotate(-14deg)}75%{transform:rotate(14deg)}}
   #angel.arrived .ang-msg{opacity:1;transform:none}
+  .arm-up{opacity:0;transform-box:view-box;transform-origin:186px 184px;transform:rotate(70deg) scale(.5);transition:opacity .2s,transform .45s cubic-bezier(.3,1.6,.5,1)}
+  .arm-down{transition:opacity .15s}
+  #angel.arrived .arm-up{opacity:1;transform:none}
+  #angel.arrived .arm-down{opacity:0}
+  .thumb{transform-box:fill-box;transform-origin:50% 100%}
+  #angel.arrived .thumb{animation:thumb .7s .45s ease-in-out 2}
+  @keyframes thumb{0%,100%{transform:rotate(0)}30%{transform:rotate(-14deg) scale(1.08)}60%{transform:rotate(8deg)}}
   .ang-sparks{position:absolute;left:50%;top:42%;width:0;height:0}
   .ang-sparks i{position:absolute;width:12px;height:12px;margin:-6px;background:#ffd84d;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);opacity:0}
   #angel.arrived .ang-sparks i{animation:spark .9s ease-out forwards}
@@ -641,7 +648,7 @@
 <div class="overlay" id="admOv">
   <div class="panel">
     <div class="row" style="align-items:flex-start">
-      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de places, soldes, profils et stock. <span style="color:var(--dim)">· v25</span></p></div>
+      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de places, soldes, profils et stock. <span style="color:var(--dim)">· v27</span></p></div>
       <button class="iconbtn" id="admClose" style="flex:none">✕</button>
     </div>
 
@@ -784,9 +791,21 @@
         </g>
         <path d="M150 140 C126 140 114 156 110 176 L88 318 C110 330 190 330 212 318 L190 176 C186 156 174 140 150 140 Z" fill="#fff" stroke="#b9cfe8" stroke-width="2.5"/>
         <path d="M150 150 L150 316" stroke="#e3edf8" stroke-width="3"/>
-        <path d="M112 186 C96 210 98 234 116 246 M188 186 C204 210 202 234 184 246" stroke="#b9cfe8" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path d="M112 186 C96 210 98 234 116 246" stroke="#b9cfe8" stroke-width="2.5" fill="none" stroke-linecap="round"/>
         <circle cx="118" cy="248" r="8" fill="#ffe1c6" stroke="#e6bfa0" stroke-width="1.5"/>
-        <circle cx="182" cy="248" r="8" fill="#ffe1c6" stroke="#e6bfa0" stroke-width="1.5"/>
+        <g class="arm-down">
+          <path d="M188 186 C204 210 202 234 184 246" stroke="#b9cfe8" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <circle cx="182" cy="248" r="8" fill="#ffe1c6" stroke="#e6bfa0" stroke-width="1.5"/>
+        </g>
+        <g class="arm-up">
+          <path d="M186 184 C204 176 218 164 226 150" stroke="#fff" stroke-width="16" fill="none" stroke-linecap="round"/>
+          <path d="M186 184 C204 176 218 164 226 150" stroke="#b9cfe8" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-dasharray="0 0"/>
+          <g transform="translate(229 154) scale(1.6) translate(-229 -154)"><g class="thumb">
+            <rect x="214" y="128" width="30" height="26" rx="8" fill="#ffe1c6" stroke="#e6bfa0" stroke-width="2"/>
+            <rect x="221" y="102" width="11" height="32" rx="5.5" fill="#ffe1c6" stroke="#e6bfa0" stroke-width="2"/>
+            <path d="M216 136 H240 M216 143 H240" stroke="#e6bfa0" stroke-width="1.6" stroke-linecap="round"/>
+          </g></g>
+        </g>
         <path d="M108 200 C130 210 170 210 192 200" stroke="#f5c542" stroke-width="4" fill="none" stroke-linecap="round"/>
       </svg>
       <div class="ang-head">
@@ -835,6 +854,6 @@
   window.addEventListener("hashchange", () => { if (location.hash === "#soucoupe") fly(); });
 })();
 </script>
-<script src="app.js?v=25"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>
