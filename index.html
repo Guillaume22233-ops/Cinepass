@@ -229,7 +229,30 @@
   details.alt[open] summary{margin-bottom:8px}
   .srow a.x{text-decoration:none}
 
-  /* Liens programmes */
+  /* Envoi par e-mail */
+  .mailbox{text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin:0 0 16px;display:flex;flex-direction:column;gap:8px}
+  .mlab{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .mrow{display:flex;gap:8px}
+  .mrow input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;outline:none;color:var(--text)}
+  .mrow input:focus{border-color:var(--line2)}
+  .mrow input.bad{border-color:var(--red)}
+  .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer;user-select:none}
+  .chk input{width:16px;height:16px;accent-color:var(--gold);cursor:pointer}
+  .mailbox .ok{min-height:0;font-size:13px}
+
+  /* Liens séances dans les cartes */
+  .tlinks{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+  .tlh{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:center}
+  .tlr{display:flex;gap:8px}
+  .tlr a{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 10px;border-radius:12px;text-decoration:none;font-weight:600;font-size:15px;transition:transform .15s,background .15s}
+  .tlr a:hover{transform:translateY(-1px)}
+  .tlr a svg{flex:none}
+  .ticket.cc .tlr a{color:var(--gold);background:var(--gold-soft);border:1.5px solid rgba(217,180,90,.45)}
+  .ticket.cc .tlr a:hover{background:rgba(217,180,90,.2)}
+  .ticket.pa .tlr a{color:var(--amber);background:var(--amber-soft);border:1.5px solid rgba(242,154,46,.45)}
+  .ticket.pa .tlr a:hover{background:rgba(242,154,46,.2)}
+
+  /* Liens programmes (ancien) */
   .links{margin-top:22px}
   .links h3{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:12px}
   .lk{display:flex;flex-wrap:wrap;gap:8px}
@@ -299,9 +322,94 @@
 
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--panel2);border:1px solid var(--line2);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:60}
   .toast.on{opacity:1;transform:translateX(-50%)}
+  /* ===== Thème « Ciel bleu » ===== */
+  :root{
+    --bg:#eef6fd; --panel:rgba(255,255,255,.86); --panel2:#f2f7fc; --line:rgba(25,60,110,.12); --line2:rgba(25,60,110,.24);
+    --text:#14263d; --muted:#56687f; --dim:#8797ab;
+    --gold:#c08a12; --gold-soft:rgba(192,138,18,.12);
+    --amber:#e0730c; --amber-soft:rgba(224,115,12,.12);
+    --red:#d93b41;
+  }
+  body{
+    background:linear-gradient(180deg,#4f9fe3 0%,#7dbcef 38%,#b7dcf7 72%,#e4f2fd 100%) fixed;
+    background-image:linear-gradient(180deg,#4f9fe3 0%,#7dbcef 38%,#b7dcf7 72%,#e4f2fd 100%);
+    color:var(--text);
+  }
+  #sky{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+  #sky .cl{position:absolute;height:auto;will-change:transform}
+  #sky .c1{top:6%;left:-320px;width:320px;opacity:.97;animation:drift 9s linear infinite;animation-delay:-1s}
+  #sky .c2{top:22%;left:-400px;width:400px;opacity:.92;animation:drift 9.6s linear infinite;animation-delay:-6s}
+  #sky .c3{top:46%;left:-260px;width:260px;opacity:.95;animation:drift 8.4s linear infinite;animation-delay:-3.5s}
+  #sky .c4{top:63%;left:-460px;width:460px;opacity:.88;animation:drift 10s linear infinite;animation-delay:-8s}
+  #sky .c5{top:34%;left:-210px;width:210px;opacity:.9;animation:drift 8.8s linear infinite;animation-delay:-5s}
+  #sky .c6{top:80%;left:-360px;width:360px;opacity:.97;animation:drift 9.3s linear infinite;animation-delay:-2.2s}
+  #ufo{position:fixed;left:-220px;top:20%;width:150px;z-index:2;pointer-events:none;display:none}
+  #ufo.go{display:block;animation:ufoX 1.3s cubic-bezier(.3,.1,.7,.9) forwards}
+  #ufo .wob{animation:ufoY 1.3s ease-in-out forwards}
+  @keyframes ufoX{from{transform:translateX(0)}to{transform:translateX(calc(100vw + 440px))}}
+  @keyframes ufoY{0%{transform:translateY(0) rotate(-8deg)}25%{transform:translateY(-40px) rotate(6deg)}50%{transform:translateY(10px) rotate(-10deg)}75%{transform:translateY(-30px) rotate(8deg)}100%{transform:translateY(-70px) rotate(-6deg)}}
+  #ufo .lt{animation:blink .18s steps(2) infinite}
+  #ufo .lt:nth-child(2n){animation-delay:.09s}
+  @keyframes blink{50%{opacity:.25}}
+  @media (prefers-reduced-motion: reduce){#ufo{display:none!important}}
+  @keyframes drift{from{transform:translateX(0)}to{transform:translateX(calc(100vw + 520px))}}
+  @media (prefers-reduced-motion: reduce){#sky .cl{animation:none;left:auto}#sky .c1{left:8%}#sky .c2{left:55%}#sky .c3{left:70%}#sky .c4{left:-5%}#sky .c5{left:30%}#sky .c6{left:60%}}
+  .screen{position:relative;z-index:1}
+
+  .ticket,.wcard,.hrow,.who,.iconbtn,.pwbar{background:rgba(255,255,255,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:rgba(255,255,255,.9);box-shadow:0 10px 30px rgba(30,80,140,.12)}
+  .ticket{border-radius:24px}
+  .ticket::before,.ticket::after{background:#a9d4f5;border-color:rgba(255,255,255,.9)}
+  .ticket .glow{display:none}
+  .perf{border-top-color:rgba(25,60,110,.18)}
+  .take{color:#fff;box-shadow:0 6px 16px rgba(30,80,140,.18)}
+  .ticket.cc .take{background:#d9a21f}
+  .ticket.pa .take{background:#ef8417}
+  .btn{background:var(--text);color:#fff}
+  .btn.ghost{background:rgba(255,255,255,.7);color:var(--text)}
+  .pwbar{padding-left:24px}
+  .pwbar input{color:var(--text)}
+  .pwbar button{background:#14263d;color:#fff}
+  .err{color:#b3262c;font-weight:600}
+  .avatar{box-shadow:0 8px 20px rgba(30,80,140,.18)}
+  .pcard .pname{color:#14263d;font-weight:500}
+  #profiles h2,.fhead h3,.section h3{color:#14263d}
+  .fhead h3,.section h3,.tlh{color:rgba(20,38,61,.7)}
+  .fdate,.ftitle{color:#14263d}
+  .fdate{color:rgba(20,38,61,.65)}
+  .poster{border-color:rgba(255,255,255,.8);box-shadow:0 8px 20px rgba(30,80,140,.18)}
+  .overlay{background:rgba(25,60,110,.32);backdrop-filter:blur(6px)}
+  .modal,.panel{background:#fff;border-color:rgba(25,60,110,.1);box-shadow:0 24px 60px rgba(20,50,100,.25)}
+  .codebox{background:#f2f7fc;border-color:rgba(25,60,110,.2)}
+  .pdfbox{background:#f2f7fc;border-color:rgba(25,60,110,.2)}
+  .pdfbox .ic{background:#fff}
+  .cond{background:#f6f9fd}
+  .cond{color:#33465e}
+  .badge.due{background:rgba(25,60,110,.07)}
+  .alertbar div{color:#8a4d06;background:rgba(242,154,46,.12)}
+  .alertbar div.red{color:#9c1f24}
+  .srow input[type=date],.panel input[type=date]{color-scheme:light}
+  .tlr a{background:#fff}
+  .ticket.cc .tlr a{color:#a6760b;border-color:rgba(192,138,18,.45)}
+  .ticket.pa .tlr a{color:#c45f06;border-color:rgba(224,115,12,.45)}
+  .tname{text-shadow:none}
+  .ticket.cc .tname{color:#c08a12}
+  .ticket.pa .tname{color:#e0730c}
+  .wamt.zero{color:#1a9c5f}
+  .wsub b{color:#1a9c5f}
+  .badge.ok{color:#1a9c5f;background:rgba(26,156,95,.12)}
+  .tprice .save{color:#1a9c5f}
+  .toast{background:#14263d;color:#fff;border:none}
+  .chk input{accent-color:#14263d}
+  .poster .ph{color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.4)}
+  .avatar{background:#fff!important;border:none}
+  .cmodal p,.fmodal .syn{color:#33465e}
+  .cmodal #cOk,#fCC,#fPA{color:#fff}
+  .meta{color:var(--muted)}
+  .ticket .tlr a{background:rgba(255,255,255,.75)}
 </style>
 </head>
 <body>
+<div id="sky" aria-hidden="true"><img class="cl c1" src="clouds/nuage1.webp" alt=""><img class="cl c2" src="clouds/nuage2.webp" alt=""><img class="cl c3" src="clouds/nuage3.webp" alt=""><img class="cl c4" src="clouds/nuage4.webp" alt=""><img class="cl c5" src="clouds/nuage5.webp" alt=""><img class="cl c6" src="clouds/nuage6.webp" alt=""></div>
 
 <!-- 1. Mot de passe -->
 <section id="lock" class="screen on">
@@ -323,8 +431,7 @@
 <!-- 3. Codes -->
 <section id="app" class="screen">
   <div class="wrap">
-    <header>
-      <div class="brand">CINÉ<span>·</span>CODES</div>
+    <header style="justify-content:flex-end">
       <div class="hright">
         <button class="iconbtn" id="adminBtn" title="Gérer">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -344,25 +451,24 @@
     <div class="grid">
       <div class="ticket cc">
         <div class="glow"></div>
-        <div><div class="tname">CinéChèque</div><div class="tsub">E-billet · à Rennes : TNB et Arvor</div><div class="tprice" id="ccPrice"></div><button class="cinfo" data-t="cinecheque">ⓘ Conditions et cinémas</button></div>
+        <div><div class="tname">CinéChèque</div><div class="tsub">E-billet · à Rennes : TNB et Arvor</div><div class="tprice" id="ccPrice"></div></div>
         <div class="count"><b id="ccN">–</b><span>disponible(s)</span></div>
         <div class="perf"></div>
         <button class="take" id="ccBtn" disabled>Prendre une place</button>
+        <div class="tlinks"><div class="tlh">Voir les séances à Rennes</div><div class="tlr" id="ccLinks"></div></div>
       </div>
       <div class="ticket pa">
         <div class="glow"></div>
-        <div><div class="tname">Pathé</div><div class="tsub">Séance standard, hors suppléments</div><div class="tprice" id="paPrice"></div><button class="cinfo" data-t="pathe">ⓘ Conditions</button></div>
+        <div><div class="tname">Pathé</div><div class="tsub">Séance standard, hors suppléments</div><div class="tprice" id="paPrice"></div></div>
         <div class="count"><b id="paN">–</b><span>disponible(s)</span></div>
         <div class="perf"></div>
         <button class="take" id="paBtn" disabled>Prendre une place</button>
+        <div class="tlinks"><div class="tlh">Voir les séances à Rennes</div><div class="tlr" id="paLinks"></div></div>
       </div>
     </div>
     <div class="status" id="status"></div>
 
-    <div class="links" id="cineLinks">
-      <h3>Programmes des cinémas à Rennes</h3>
-      <div class="lk" id="lkList"></div>
-    </div>
+
 
     <div class="section">
       <h3>Mon solde</h3>
@@ -429,6 +535,15 @@
     </div>
     <div class="meta" id="mMeta"></div>
     <div class="cond" id="mCond" style="margin-top:0"></div>
+    <form class="mailbox" id="mailForm" novalidate>
+      <div class="mlab">Recevoir par e-mail</div>
+      <div class="mrow">
+        <input type="email" id="mailTo" placeholder="ton@email.fr" autocomplete="email">
+        <button class="btn small" type="submit" id="mailBtn">Envoyer</button>
+      </div>
+      <label class="chk"><input type="checkbox" id="mailRemember"> Se souvenir de l'adresse</label>
+      <div class="ok" id="mailOk"></div>
+    </form>
     <div class="mbtns">
       <button class="btn ghost" id="mClose">Fermer</button>
       <button class="btn" id="mCopy">Copier</button>
@@ -440,7 +555,7 @@
 <div class="overlay" id="admOv">
   <div class="panel">
     <div class="row" style="align-items:flex-start">
-      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de places, soldes, profils et stock. <span style="color:var(--dim)">· v12</span></p></div>
+      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de places, soldes, profils et stock. <span style="color:var(--dim)">· v15</span></p></div>
       <button class="iconbtn" id="admClose" style="flex:none">✕</button>
     </div>
 
@@ -546,6 +661,36 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=12"></script>
+<div id="ufo" aria-hidden="true"><svg class="wob" viewBox="0 0 160 90" width="150">
+  <defs>
+    <linearGradient id="ufoDisc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef2f7"/><stop offset=".55" stop-color="#a9b4c2"/><stop offset="1" stop-color="#5d6877"/></linearGradient>
+    <radialGradient id="ufoDome" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#e9fbff"/><stop offset=".6" stop-color="#8fe0f0" stop-opacity=".85"/><stop offset="1" stop-color="#3fa9c4" stop-opacity=".8"/></radialGradient>
+  </defs>
+  <path d="M40 46 Q42 14 80 12 Q118 14 120 46 Z" fill="url(#ufoDome)" stroke="#6fbfd3" stroke-width="1.5"/>
+  <ellipse cx="68" cy="26" rx="10" ry="5" fill="#fff" opacity=".7"/>
+  <ellipse cx="80" cy="52" rx="76" ry="17" fill="url(#ufoDisc)" stroke="#4d5866" stroke-width="1.5"/>
+  <ellipse cx="80" cy="46" rx="60" ry="6" fill="#dfe6ee" opacity=".7"/>
+  <g><circle class="lt" cx="24" cy="54" r="4" fill="#ffd23f"/><circle class="lt" cx="44" cy="59" r="4" fill="#ff5d5d"/><circle class="lt" cx="66" cy="62" r="4" fill="#7dff8a"/><circle class="lt" cx="94" cy="62" r="4" fill="#ffd23f"/><circle class="lt" cx="116" cy="59" r="4" fill="#ff5d5d"/><circle class="lt" cx="136" cy="54" r="4" fill="#7dff8a"/></g>
+  <ellipse cx="80" cy="69" rx="24" ry="5" fill="#2f3945"/>
+</svg></div>
+<script>
+(() => {
+  // Soucoupe volante : passe à chaque 5e visite, puis toutes les 20 minutes si la page reste ouverte.
+  const ufo = document.getElementById("ufo");
+  function fly(){
+    ufo.classList.remove("go"); void ufo.offsetWidth;
+    ufo.style.top = (8 + Math.random() * 50) + "%";
+    ufo.classList.add("go");
+    setTimeout(() => ufo.classList.remove("go"), 1500);
+  }
+  window.ccFlyUfo = fly;
+  let visits = 0;
+  try { visits = (parseInt(localStorage.getItem("cc_visits") || "0", 10) || 0) + 1; localStorage.setItem("cc_visits", visits); } catch(e){}
+  if (visits > 0 && visits % 5 === 0) setTimeout(fly, 2500);
+  setInterval(fly, 20 * 60 * 1000);
+  if (location.hash === "#soucoupe") setTimeout(fly, 800);
+})();
+</script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

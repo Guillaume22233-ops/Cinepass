@@ -79,11 +79,26 @@ function site_settings($db) {
 function rearm_alerts(&$db) {
     foreach (TYPES as $t) if (avail_count($db, $t) > 1) $db['site']['alertSent'][$t] = false;
 }
-function send_mail($to, $subject, $body) {
+/** Envoie un e-mail texte, avec un PDF en pièce jointe si besoin. */
+function send_mail($to, $subject, $body, $pdfPath = null, $pdfName = null) {
     $host = preg_replace('/:\d+$/', '', preg_replace('/^www\./', '', $_SERVER['HTTP_HOST'] ?? 'localhost'));
-    $headers = "From: Cine Codes <noreply@$host>\r\nContent-Type: text/plain; charset=utf-8\r\n";
-    return @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, $headers);
+    $subject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+    if (!$pdfPath) {
+        $headers = "From: Cine Codes <noreply@$host>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n";
+        return @mail($to, $subject, $body, $headers);
+    }
+    $b = 'cc' . bin2hex(random_bytes(8));
+    $headers = "From: Cine Codes <noreply@$host>\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"$b\"\r\n";
+    $msg = "--$b\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n$body\r\n"
+         . "--$b\r\nContent-Type: application/pdf; name=\"$pdfName\"\r\nContent-Transfer-Encoding: base64\r\n"
+         . "Content-Disposition: attachment; filename=\"$pdfName\"\r\n\r\n"
+         . chunk_split(base64_encode(file_get_contents($pdfPath))) . "\r\n--$b--\r\n";
+    return @mail($to, $subject, $msg, $headers);
 }
+const COND_TEXT = [
+    'cinecheque' => "Liste des cinémas affiliés : https://www.reseauxdecines.com/loc/ecinecheque.html\nÀ Rennes : TNB et Arvor.",
+    'pathe'      => "Valable pour une séance standard. Tout supplément (3D, IMAX, 4DX…) est à régler en plus sur place.",
+];
 const TYPE_LABELS = ['cinecheque' => 'CinéChèque', 'pathe' => 'Pathé'];
 
 function need_login() { if (empty($_SESSION['ok'])) out(['error' => 'auth'], 401); }
@@ -143,7 +158,7 @@ case 'state':
         }
         return [['counts' => $counts, 'mine' => $mine, 'profile' => $me, 'admin' => !empty($_SESSION['admin']),
                  'owed' => round($owed, 2), 'saved' => round($saved, 2), 'pay' => $pay,
-                 'links' => site_settings($db)['links']], false];
+                 'links' => site_settings($db)['links'], 'myEmail' => ($me !== null ? ($db['emails'][$me] ?? '') : '')], false];
     }));
 
 case 'claim':
@@ -205,6 +220,45 @@ case 'my_paid':
         return [$n, $n > 0];
     });
     out(['ok' => true, 'changed' => $n]);
+
+case 'send_place':
+    // Envoie la place (PDF en pièce jointe, ou code) par e-mail au profil qui l'a réservée.
+    need_login();
+    $me = $_SESSION['profile'] ?? null;
+    $isAdmin = !empty($_SESSION['admin']);
+    $id = (string)($in['id'] ?? '');
+    $email = trim((string)($in['email'] ?? ''));
+    $remember = !empty($in['remember']);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) out(['error' => 'Adresse e-mail invalide'], 400);
+    $c = with_db(function (&$db) use ($id, $me, $isAdmin, $email, $remember) {
+        $found = null;
+        foreach ($db['codes'] as &$c) {
+            if ($c['id'] !== $id || !$c['taken'] || !($isAdmin || $c['takenBy'] === $me)) continue;
+            if (($c['mailed'] ?? 0) >= 10) return [['error' => 'Trop d\'envois pour cette place'], false];
+            $c['mailed'] = ($c['mailed'] ?? 0) + 1;
+            $found = $c;
+            break;
+        }
+        if (!$found) return [null, false];
+        if ($me !== null) {
+            if ($remember) $db['emails'][$me] = $email;
+            else unset($db['emails'][$me]);
+        }
+        return [$found, true];
+    });
+    if (!$c) out(['error' => 'Place introuvable'], 404);
+    if (isset($c['error'])) out($c, 429);
+    $label = TYPE_LABELS[$c['type']] ?? 'Place';
+    $body = "Bonjour,\n\nVoici ta place $label réservée sur Ciné Codes (profil : {$c['takenBy']}).\n\n"
+          . (empty($c['file']) ? "Code : {$c['code']}\n\n" : "Le billet est en pièce jointe (PDF).\n\n")
+          . (!empty($c['expires']) ? 'Valable jusqu\'au ' . date('d/m/Y', strtotime($c['expires'])) . ".\n\n" : '')
+          . (COND_TEXT[$c['type']] ?? '') . "\n\nBonne séance 🍿";
+    $path = !empty($c['file']) ? PDF_DIR . '/' . basename($c['file']) : null;
+    if ($path && !is_file($path)) $path = null;
+    $fname = ($c['type'] === 'pathe' ? 'Pathe' : 'CineCheque') . '-' . trim(preg_replace('/[^A-Za-z0-9_-]+/', '-', $c['code']), '-') . '.pdf';
+    $ok = send_mail($email, "Ta place $label 🎟️", $body, $path, $fname);
+    if (!$ok) out(['error' => "L'e-mail n'a pas pu partir. Réessaie plus tard."], 500);
+    out(['ok' => true]);
 
 case 'films':
     need_login();

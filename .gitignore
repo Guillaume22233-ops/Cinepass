@@ -1,0 +1,9 @@
+# Réglages privés (mots de passe, clé TMDB)
+config.php
+
+# Données du site (codes, cache des films)
+data/*
+!data/.htaccess
+!data/index.html
+
+.DS_Store

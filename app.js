@@ -9,11 +9,15 @@
       cond: `Valable pour une séance standard, hors séances spéciales. Tout supplément (3D, IMAX, IMAX 3D, fauteuil premium, D-Box et prestations complémentaires) est à régler en plus sur place.` }
   };
   // Programmes des cinémas de Rennes (affichés sous les boutons de réservation)
-  const CINE_LINKS = [
-    { name: "Pathé Rennes", url: "https://www.pathe.fr/cinemas/cinema-pathe-rennes" },
-    { name: "Arvor",        url: "https://www.cinema-arvor.fr/seances/" },
-    { name: "TNB",          url: "https://www.t-n-b.fr/programmation?subsections=cinema" },
-  ];
+  const CINE_LINKS = {
+    cinecheque: [
+      { name: "TNB",   url: "https://www.t-n-b.fr/programmation?subsections=cinema" },
+      { name: "Arvor", url: "https://www.cinema-arvor.fr/seances/" },
+    ],
+    pathe: [
+      { name: "Pathé Rennes", url: "https://www.pathe.fr/cinemas/cinema-pathe-rennes" },
+    ],
+  };
   function setCond(el, type){ const T = TYPES[type]; el.innerHTML = T ? T.cond : ""; el.style.display = T ? "" : "none"; el.classList.toggle("pathe", type === "pathe"); }
 
   const $ = id => document.getElementById(id);
@@ -189,7 +193,10 @@
     });
     $("payAll").style.display = due.length > 1 ? "" : "none";
 
-    $("lkList").innerHTML = CINE_LINKS.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.name)} <span class="ar">↗</span></a>`).join("");
+    const ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`;
+    [["ccLinks","cinecheque"],["paLinks","pathe"]].forEach(([id,t]) => {
+      $(id).innerHTML = CINE_LINKS[t].map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${ICON}${esc(l.name)}</a>`).join("");
+    });
   }
 
   async function claim(type){
@@ -247,7 +254,14 @@
   };
 
   /* ---------- Pop-up ---------- */
+  let curCode = null;
   function openCode(c){
+    curCode = c;
+    const saved = (state && state.myEmail) || "";
+    $("mailTo").value = saved; $("mailTo").classList.remove("bad");
+    $("mailRemember").checked = !!saved;
+    $("mailOk").textContent = ""; $("mailOk").style.color = "";
+    $("mailBtn").disabled = false; $("mailBtn").textContent = "Envoyer";
     const T = TYPES[c.type] || {label:c.type,color:"var(--text)"};
     $("mType").textContent = T.label; $("mType").style.color = T.color;
     setCond($("mCond"), c.type);
@@ -266,6 +280,26 @@
     $("mCopy").textContent = "Copier";
     $("codeOv").classList.add("on");
   }
+  $("mailTo").addEventListener("input", () => { $("mailTo").classList.remove("bad"); $("mailOk").textContent = ""; });
+  $("mailForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    if (!curCode) return;
+    const email = $("mailTo").value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      $("mailTo").classList.add("bad"); $("mailOk").style.color = "var(--red)"; $("mailOk").textContent = "Entre une adresse e-mail valide."; return;
+    }
+    $("mailBtn").disabled = true; $("mailBtn").textContent = "Envoi…"; $("mailOk").textContent = "";
+    try {
+      await api("send_place", { id: curCode.id, email, remember: $("mailRemember").checked });
+      $("mailOk").style.color = ""; $("mailOk").textContent = "Envoyé à " + email + " ✓ (regarde aussi dans les spams)";
+      $("mailBtn").textContent = "Renvoyer";
+      if (state) state.myEmail = $("mailRemember").checked ? email : "";
+    } catch(err){
+      $("mailOk").style.color = "var(--red)"; $("mailOk").textContent = err.error || "L'envoi a échoué, réessaie.";
+      $("mailBtn").textContent = "Envoyer";
+    }
+    $("mailBtn").disabled = false;
+  });
   $("mClose").onclick = () => $("codeOv").classList.remove("on");
   $("codeOv").onclick = e => { if (e.target === $("codeOv")) $("codeOv").classList.remove("on"); };
   $("mCopy").onclick = async () => {
