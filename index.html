@@ -351,9 +351,7 @@
   #ufo .lt{animation:blink .18s steps(2) infinite}
   #ufo .lt:nth-child(2n){animation-delay:.09s}
   @keyframes blink{50%{opacity:.25}}
-  @media (prefers-reduced-motion: reduce){#ufo{display:none!important}}
   @keyframes drift{from{transform:translateX(0)}to{transform:translateX(calc(100vw + 520px))}}
-  @media (prefers-reduced-motion: reduce){#sky .cl{animation:none;left:auto}#sky .c1{left:8%}#sky .c2{left:55%}#sky .c3{left:70%}#sky .c4{left:-5%}#sky .c5{left:30%}#sky .c6{left:60%}}
   .screen{position:relative;z-index:1}
 
   .ticket,.wcard,.hrow,.who,.iconbtn,.pwbar{background:rgba(255,255,255,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:rgba(255,255,255,.9);box-shadow:0 10px 30px rgba(30,80,140,.12)}
@@ -405,7 +403,11 @@
   .cmodal p,.fmodal .syn{color:#33465e}
   .cmodal #cOk,#fCC,#fPA{color:#fff}
   .meta{color:var(--muted)}
-  .ticket .tlr a{background:rgba(255,255,255,.75)}
+  .ticket .tlr a,.ticket.cc .tlr a,.ticket.pa .tlr a{background:#14263d;color:#fff;border:none;box-shadow:0 6px 14px rgba(20,38,61,.18)}
+  .ticket .tlr a:hover,.ticket.cc .tlr a:hover,.ticket.pa .tlr a:hover{background:#1f3654}
+  .ldot{width:9px;height:9px;border-radius:50%;flex:none}
+  .ticket.cc .ldot{background:#e8b84a}
+  .ticket.pa .ldot{background:#f39a45}
 </style>
 </head>
 <body>
@@ -555,7 +557,7 @@
 <div class="overlay" id="admOv">
   <div class="panel">
     <div class="row" style="align-items:flex-start">
-      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de places, soldes, profils et stock. <span style="color:var(--dim)">· v15</span></p></div>
+      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de places, soldes, profils et stock. <span style="color:var(--dim)">· v17</span></p></div>
       <button class="iconbtn" id="admClose" style="flex:none">✕</button>
     </div>
 
@@ -677,11 +679,13 @@
 (() => {
   // Soucoupe volante : passe à chaque 5e visite, puis toutes les 20 minutes si la page reste ouverte.
   const ufo = document.getElementById("ufo");
+  let tm = null;
   function fly(){
+    clearTimeout(tm);
     ufo.classList.remove("go"); void ufo.offsetWidth;
     ufo.style.top = (8 + Math.random() * 50) + "%";
     ufo.classList.add("go");
-    setTimeout(() => ufo.classList.remove("go"), 1500);
+    tm = setTimeout(() => ufo.classList.remove("go"), 1500);
   }
   window.ccFlyUfo = fly;
   let visits = 0;
@@ -689,8 +693,9 @@
   if (visits > 0 && visits % 5 === 0) setTimeout(fly, 2500);
   setInterval(fly, 20 * 60 * 1000);
   if (location.hash === "#soucoupe") setTimeout(fly, 800);
+  window.addEventListener("hashchange", () => { if (location.hash === "#soucoupe") fly(); });
 })();
 </script>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

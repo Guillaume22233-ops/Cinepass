@@ -193,7 +193,7 @@
     });
     $("payAll").style.display = due.length > 1 ? "" : "none";
 
-    const ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>`;
+    const ICON = `<span class="ldot" aria-hidden="true"></span>`;
     [["ccLinks","cinecheque"],["paLinks","pathe"]].forEach(([id,t]) => {
       $(id).innerHTML = CINE_LINKS[t].map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${ICON}${esc(l.name)}</a>`).join("");
     });
