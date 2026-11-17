@@ -140,6 +140,26 @@ case 'claim':
     if (!$code) out(['error' => 'Plus de place disponible'], 409);
     out(['code' => $code]);
 
+case 'my_paid':
+    // Fonctionne à la confiance : chacun marque lui-même ses places comme remboursées (ou annule).
+    need_login();
+    $me = $_SESSION['profile'] ?? null;
+    if (!$me) out(['error' => 'Choisissez un profil'], 400);
+    $id = $in['id'] ?? null;
+    $all = !empty($in['all']);
+    $paid = array_key_exists('paid', $in) ? (bool)$in['paid'] : true;
+    $n = with_db(function (&$db) use ($me, $id, $all, $paid) {
+        $n = 0; $now = time() * 1000;
+        foreach ($db['codes'] as &$c) {
+            if (!$c['taken'] || $c['takenBy'] !== $me) continue;
+            if (!$all && $c['id'] !== $id) continue;
+            if ($all && !empty($c['paid'])) continue;
+            $c['paid'] = $paid; $c['paidAt'] = $paid ? $now : null; $n++;
+        }
+        return [$n, $n > 0];
+    });
+    out(['ok' => true, 'changed' => $n]);
+
 case 'films':
     need_login();
     if (!defined('TMDB_KEY') || TMDB_KEY === '') out(['films' => []]);

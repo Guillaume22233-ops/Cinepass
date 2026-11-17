@@ -147,8 +147,7 @@
     const pay = state.pay;
     if (pay) {
       [["ccPrice","cinecheque"],["paPrice","pathe"]].forEach(([id,t]) => {
-        const pct = pay.full[t] > 0 ? Math.round((1 - pay.price[t]/pay.full[t]) * 100) : 0;
-        $(id).innerHTML = `<b>${eur(pay.price[t])}</b>${pay.full[t] > pay.price[t] ? `<s>${eur(pay.full[t])}</s><span class="save">−${pct} %</span>` : ""}`;
+        $(id).innerHTML = `<b>${eur(pay.price[t])}</b>${pay.full[t] > pay.price[t] ? `<span>au lieu de ${eur(pay.full[t])} (prix standard)</span>` : ""}`;
       });
     }
 
@@ -156,17 +155,29 @@
     const due = mine.filter(c => !c.paid);
     $("owed").textContent = eur(state.owed);
     $("owed").classList.toggle("zero", !state.owed);
-    $("owedSub").innerHTML = (state.owed ? `${due.length} place${due.length>1?"s":""} non réglée${due.length>1?"s":""}` : (mine.length ? "Vous êtes à jour ✓" : "Rien à régler pour l'instant"))
-      + (state.saved > 0 ? ` · économie totale <b>${eur(state.saved)}</b>` : "");
+    $("owedSub").innerHTML = state.owed
+      ? `Pour ${due.length} place${due.length>1?"s":""}, quand tu peux 🙂`
+      : (mine.length ? "Tout est remboursé, merci ! 🙌" : "Rien à rembourser");
     const phone = pay && pay.phone;
     $("weroBox").style.display = phone ? "" : "none";
     if (phone) $("weroNum").textContent = phone;
 
     $("hist").innerHTML = mine.length ? mine.map((c,k) => {
       const T = TYPES[c.type] || {label:c.type,color:"var(--muted)"};
-      return `<button class="hrow" data-k="${k}"><span class="dot" style="background:${T.color}"></span><span class="k">${c.file ? "📄 " : ""}${esc(c.code)}</span><span class="t">${esc(T.label)} · ${eur(c.price)} · ${fmt(c.takenAt)}</span><span class="badge ${c.paid?"ok":"due"}">${c.paid?"Réglé":"À régler"}</span></button>`;
+      return `<div class="hrow" data-k="${k}" role="button" tabindex="0"><span class="dot" style="background:${T.color}"></span><span class="k">${c.file ? "📄 " : ""}${esc(c.code)}</span><span class="t">${esc(T.label)} · ${eur(c.price)} · ${fmt(c.takenAt)}</span>${c.paid
+        ? `<button class="badge ok" data-undo="${esc(c.id)}" title="Annuler">Remboursé ✓</button>`
+        : `<button class="paybtn" data-pay="${esc(c.id)}">J'ai remboursé</button>`}</div>`;
     }).join("") : `<div class="empty">Aucune place réservée pour l'instant.</div>`;
-    $("hist").querySelectorAll(".hrow").forEach(b => b.onclick = () => openCode(mine[+b.dataset.k]));
+    $("hist").querySelectorAll(".hrow").forEach(b => {
+      b.onclick = e => { if (!e.target.closest("button")) openCode(mine[+b.dataset.k]); };
+      b.onkeydown = e => { if (e.key === "Enter" && e.target === b) openCode(mine[+b.dataset.k]); };
+    });
+    $("hist").querySelectorAll("[data-pay]").forEach(b => b.onclick = () => myPaid({ id: b.dataset.pay, paid: true }, b));
+    $("hist").querySelectorAll("[data-undo]").forEach(b => b.onclick = () => {
+      if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "Annuler ?"; setTimeout(() => { if (b.isConnected) { b.dataset.sure = ""; b.textContent = "Remboursé ✓"; } }, 3000); return; }
+      myPaid({ id: b.dataset.undo, paid: false }, b);
+    });
+    $("payAll").style.display = due.length > 1 ? "" : "none";
   }
 
   async function claim(type){
@@ -191,7 +202,7 @@
     $("cTitle").textContent = "Réserver une place " + T.label + "\u00a0?";
     $("cText").innerHTML = "Une place " + esc(T.label) + " va être attribuée au profil <b>" + esc(profile) + "</b>" + (film ? " pour voir <b>" + esc(film) + "</b>" : "") + ".";
     const pay = state && state.pay;
-    $("cPrice").innerHTML = pay ? `Prix : <b>${eur(pay.price[type])}</b>` + (pay.full[type] > pay.price[type] ? ` <span style="color:var(--dim)">au lieu de <s>${eur(pay.full[type])}</s></span>` : "") : "";
+    $("cPrice").innerHTML = pay ? `Prix : <b>${eur(pay.price[type])}</b>` + (pay.full[type] > pay.price[type] ? ` <span style="color:var(--muted)">au lieu de ${eur(pay.full[type])} (prix standard)</span>` : "") : "";
     setCond($("cCond"), type);
     $("cIcon").style.background = type === "pathe" ? "var(--amber-soft)" : "var(--gold-soft)";
     $("cOk").style.background = T.color;
@@ -208,6 +219,18 @@
     try { await navigator.clipboard.writeText(n); $("weroCopy").textContent = "Copié ✓"; }
     catch(e){ const r=document.createRange(); r.selectNodeContents($("weroNum")); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r); $("weroCopy").textContent = "Sélectionné"; }
     setTimeout(() => $("weroCopy").textContent = "Copier le numéro", 2000);
+  };
+
+  async function myPaid(body, btn){
+    if (btn) btn.disabled = true;
+    try { await api("my_paid", body); await refresh(); if (body.paid !== false) toast("Merci ! 🙌"); }
+    catch(e){ toast(e.error || "Erreur, réessaie."); if (btn) btn.disabled = false; }
+  }
+  $("payAll").onclick = () => {
+    const b = $("payAll");
+    if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "Sûr ? Clique pour confirmer"; setTimeout(() => { b.dataset.sure = ""; b.textContent = "J'ai tout remboursé"; }, 3000); return; }
+    b.dataset.sure = ""; b.textContent = "J'ai tout remboursé";
+    myPaid({ all: true, paid: true }, b).then(() => { b.disabled = false; });
   };
 
   /* ---------- Pop-up ---------- */
