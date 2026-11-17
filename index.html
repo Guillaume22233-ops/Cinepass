@@ -330,19 +330,15 @@
     --amber:#e0730c; --amber-soft:rgba(224,115,12,.12);
     --red:#d93b41;
   }
-  body{
-    background:linear-gradient(180deg,#4f9fe3 0%,#7dbcef 38%,#b7dcf7 72%,#e4f2fd 100%) fixed;
-    background-image:linear-gradient(180deg,#4f9fe3 0%,#7dbcef 38%,#b7dcf7 72%,#e4f2fd 100%);
-    color:var(--text);
-  }
-  #sky{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+  body{background:#9ccbf2;background-image:none;color:var(--text)}
+  #sky{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0;background:linear-gradient(180deg,#4f9fe3 0%,#7dbcef 38%,#b7dcf7 72%,#e4f2fd 100%)}
   #sky .cl{position:absolute;height:auto;will-change:transform}
-  #sky .c1{top:6%;left:-320px;width:320px;opacity:.97;animation:drift 9s linear infinite;animation-delay:-1s}
-  #sky .c2{top:22%;left:-400px;width:400px;opacity:.92;animation:drift 9.6s linear infinite;animation-delay:-6s}
-  #sky .c3{top:46%;left:-260px;width:260px;opacity:.95;animation:drift 8.4s linear infinite;animation-delay:-3.5s}
-  #sky .c4{top:63%;left:-460px;width:460px;opacity:.88;animation:drift 10s linear infinite;animation-delay:-8s}
-  #sky .c5{top:34%;left:-210px;width:210px;opacity:.9;animation:drift 8.8s linear infinite;animation-delay:-5s}
-  #sky .c6{top:80%;left:-360px;width:360px;opacity:.97;animation:drift 9.3s linear infinite;animation-delay:-2.2s}
+  #sky .c1{top:6%;left:-320px;width:320px;opacity:.97;animation:drift 18s linear infinite;animation-delay:-2s}
+  #sky .c2{top:22%;left:-400px;width:400px;opacity:.92;animation:drift 19.2s linear infinite;animation-delay:-12s}
+  #sky .c3{top:46%;left:-260px;width:260px;opacity:.95;animation:drift 16.8s linear infinite;animation-delay:-7s}
+  #sky .c4{top:63%;left:-460px;width:460px;opacity:.88;animation:drift 20s linear infinite;animation-delay:-16s}
+  #sky .c5{top:34%;left:-210px;width:210px;opacity:.9;animation:drift 17.6s linear infinite;animation-delay:-10s}
+  #sky .c6{top:80%;left:-360px;width:360px;opacity:.97;animation:drift 18.6s linear infinite;animation-delay:-4.4s}
   #ufo{position:fixed;left:-220px;top:20%;width:150px;z-index:2;pointer-events:none;display:none}
   #ufo.go{display:block;animation:ufoX 1.3s cubic-bezier(.3,.1,.7,.9) forwards}
   #ufo .wob{animation:ufoY 1.3s ease-in-out forwards}
@@ -398,6 +394,31 @@
   .tprice .save{color:#1a9c5f}
   .toast{background:#14263d;color:#fff;border:none}
   .chk input{accent-color:#14263d}
+
+  /* ===== Optimisations mobile ===== */
+  .overlay{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .overlay > .modal,.overlay > .panel{margin:auto}
+  .hrow .k{flex:1;min-width:0}
+  .chk input{width:20px;height:20px}
+  .chk{padding:4px 0}
+  @media (max-width:640px){
+    input,textarea,select,.tin,.mrow input,.panel textarea,.panel .tin{font-size:16px}
+    .screen{padding:20px 14px}
+    .hrow{flex-wrap:wrap;row-gap:4px;padding:12px}
+    .hrow .t{order:3;flex-basis:100%;padding-left:20px;white-space:normal;line-height:1.4}
+    .hrow .paybtn,.hrow .badge{padding:8px 12px;font-size:12px}
+    .srow{flex-wrap:wrap;row-gap:6px;padding:10px}
+    .srow .k{flex:1 1 calc(100% - 40px)}
+    .srow .x{min-width:36px;min-height:36px;display:inline-grid;place-items:center;font-size:15px}
+    .srow input[type=date]{height:36px;width:auto;flex:1;font-size:16px}
+    .lrow .badge,.brow .btn{min-height:34px;padding:8px 12px}
+    .seg button{padding:11px}
+    .modal{padding:24px 18px 18px}
+    .panel{padding:18px;max-height:none}
+    .tlr a{padding:14px 10px}
+    .wamt{font-size:44px}
+    .hlog,.stock{max-height:none;overflow:visible}
+  }
   .poster .ph{color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.4)}
   .avatar{background:#fff!important;border:none}
   .cmodal p,.fmodal .syn{color:#33465e}
@@ -536,7 +557,6 @@
       </div>
     </div>
     <div class="meta" id="mMeta"></div>
-    <div class="cond" id="mCond" style="margin-top:0"></div>
     <form class="mailbox" id="mailForm" novalidate>
       <div class="mlab">Recevoir par e-mail</div>
       <div class="mrow">
@@ -557,7 +577,7 @@
 <div class="overlay" id="admOv">
   <div class="panel">
     <div class="row" style="align-items:flex-start">
-      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de places, soldes, profils et stock. <span style="color:var(--dim)">· v17</span></p></div>
+      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de places, soldes, profils et stock. <span style="color:var(--dim)">· v19</span></p></div>
       <button class="iconbtn" id="admClose" style="flex:none">✕</button>
     </div>
 
@@ -696,6 +716,6 @@
   window.addEventListener("hashchange", () => { if (location.hash === "#soucoupe") fly(); });
 })();
 </script>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

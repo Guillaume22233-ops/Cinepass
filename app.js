@@ -264,7 +264,6 @@
     $("mailBtn").disabled = false; $("mailBtn").textContent = "Envoyer";
     const T = TYPES[c.type] || {label:c.type,color:"var(--text)"};
     $("mType").textContent = T.label; $("mType").style.color = T.color;
-    setCond($("mCond"), c.type);
     const isPdf = !!c.file;
     $("mCode").style.display = isPdf ? "none" : "";
     $("mPdf").style.display = isPdf ? "" : "none";
