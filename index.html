@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ciné Codes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#08080a; --panel:#111114; --panel2:#17171b; --line:#25252b; --line2:#33333b;
+    --text:#ececef; --muted:#8b8b94; --dim:#5d5d66;
+    --gold:#d9b45a; --gold-soft:rgba(217,180,90,.12);
+    --amber:#f29a2e; --amber-soft:rgba(242,154,46,.12);
+    --red:#e5484d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:Inter,system-ui,sans-serif; font-size:15px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(217,180,90,.07), transparent 70%),
+      radial-gradient(ellipse 60% 40% at 50% 110%, rgba(229,72,77,.04), transparent 70%);
+    background-attachment:fixed;
+    min-height:100vh;
+  }
+  button{font:inherit;color:inherit;cursor:pointer;border:none;background:none}
+  input,textarea,select{font:inherit;color:var(--text)}
+  .screen{display:none;min-height:100vh;padding:32px 20px}
+  .screen.on{display:flex;flex-direction:column;align-items:center;animation:fade .35s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .brand{font-family:"Bebas Neue",sans-serif;letter-spacing:.08em;font-size:56px;line-height:1;color:var(--text)}
+  .brand span{color:var(--gold)}
+  .tag{color:var(--muted);font-size:13px;letter-spacing:.18em;text-transform:uppercase;margin-top:10px}
+  h2{font-family:"Bebas Neue",sans-serif;font-weight:400;letter-spacing:.06em;font-size:34px}
+
+  /* Lock */
+  #lock{justify-content:center}
+  .lockbox{width:100%;max-width:360px;text-align:center}
+  .bulbs{display:flex;justify-content:center;gap:10px;margin-bottom:28px}
+  .bulbs i{width:7px;height:7px;border-radius:50%;background:var(--gold);opacity:.25;animation:blink 2.4s infinite}
+  .bulbs i:nth-child(2n){animation-delay:.6s}.bulbs i:nth-child(3n){animation-delay:1.2s}
+  @keyframes blink{0%,100%{opacity:.2}50%{opacity:.9;box-shadow:0 0 10px var(--gold)}}
+  .field{margin-top:40px;display:flex;flex-direction:column;gap:12px}
+  .input{
+    width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;font-size:16px;outline:none;transition:border-color .2s;text-align:center;letter-spacing:.15em
+  }
+  .input:focus{border-color:var(--gold)}
+  .btn{
+    background:var(--text);color:#0a0a0a;font-weight:600;border-radius:12px;padding:14px 18px;
+    transition:transform .12s, opacity .2s;
+  }
+  .btn:hover{transform:translateY(-1px)}
+  .btn:active{transform:translateY(0)}
+  .btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line2)}
+  .btn.small{padding:8px 12px;font-size:13px;border-radius:9px}
+  .err{color:var(--red);font-size:13px;min-height:20px}
+  .shake{animation:shake .4s}
+  @keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+  .note{color:var(--dim);font-size:12px;margin-top:22px}
+
+
+  /* Barre mot de passe */
+  #lock{justify-content:center;gap:14px}
+  .pwbar{display:flex;align-items:center;width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 6px 6px 22px;transition:border-color .2s, box-shadow .2s}
+  .pwbar:focus-within{border-color:var(--line2);box-shadow:0 0 0 6px rgba(255,255,255,.03)}
+  .pwbar input{flex:1;min-width:0;background:none;border:none;outline:none;font-size:16px;letter-spacing:.12em;padding:10px 0}
+  .pwbar input::placeholder{letter-spacing:.04em;color:var(--dim)}
+  .pwbar button{width:44px;height:44px;border-radius:50%;background:var(--text);color:#0a0a0a;display:grid;place-items:center;flex:none;transition:transform .15s}
+  .pwbar button:hover{transform:translateX(2px)}
+  .pwbar button:disabled{opacity:.4}
+
+  /* Films */
+  .films{margin:0 0 30px}
+  .fhead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+  .fhead h3{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .fhead span{font-size:11px;color:var(--dim)}
+  .strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 10px;margin:0 -2px;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+  .strip::-webkit-scrollbar{height:6px}.strip::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+  .film{flex:none;width:118px;scroll-snap-align:start;text-align:left;display:flex;flex-direction:column;align-self:flex-start}
+  .poster{position:relative;aspect-ratio:2/3;border-radius:10px;background:#1a1a1f center/cover no-repeat;border:1px solid var(--line);overflow:hidden;transition:transform .2s,border-color .2s}
+  .film:hover .poster{transform:translateY(-3px);border-color:var(--line2)}
+  .poster .ph{position:absolute;inset:0;display:flex;align-items:flex-end;padding:10px;font-family:"Bebas Neue",sans-serif;font-size:20px;line-height:1.05;letter-spacing:.03em}
+  .rank{position:absolute;left:6px;top:2px;font-family:"Bebas Neue",sans-serif;font-size:34px;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.8)}
+  .ftitle{font-size:13px;font-weight:500;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .fdate{font-size:11px;color:var(--muted)}
+  .modal.fmodal{max-width:520px;text-align:left;display:flex;gap:18px}
+  .fmodal .poster{width:140px;flex:none;align-self:flex-start}
+  .fmodal h4{font-family:"Bebas Neue",sans-serif;font-weight:400;font-size:30px;letter-spacing:.03em;line-height:1}
+  .fmodal .fmeta{color:var(--muted);font-size:12px;margin:6px 0 10px}
+  .fmodal .syn{font-size:13px;color:#c9c9cf;max-height:150px;overflow:auto;margin-bottom:16px}
+  .fmodal .fbtns{display:flex;gap:8px;flex-wrap:wrap}
+  .fmodal .fbtns button{flex:1;min-width:120px;padding:11px;border-radius:10px;font-weight:600;font-size:13px;color:#0a0a0a}
+  @media(max-width:520px){.modal.fmodal{flex-direction:column}.fmodal .poster{width:110px}}
+
+  /* Profiles */
+  #profiles{justify-content:center}
+  .plist{display:flex;flex-wrap:wrap;justify-content:center;gap:26px;margin-top:44px;max-width:720px}
+  .pcard{display:flex;flex-direction:column;align-items:center;gap:12px;width:112px;transition:transform .18s}
+  .pcard:hover{transform:translateY(-4px)}
+  .pcard:hover .avatar{border-color:var(--text)}
+  .avatar{
+    width:104px;height:104px;border-radius:18px;display:grid;place-items:center;
+    font-family:"Bebas Neue",sans-serif;font-size:46px;letter-spacing:.04em;
+    border:2px solid transparent;transition:border-color .18s;
+  }
+  .pname{color:var(--muted);font-size:14px;text-align:center;word-break:break-word}
+  .pcard:hover .pname{color:var(--text)}
+
+  /* App */
+  #app{align-items:stretch}
+  .wrap{width:100%;max-width:880px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:36px}
+  header .brand{font-size:34px}
+  .who{display:flex;align-items:center;gap:10px;padding:6px 12px 6px 6px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+  .who .avatar{width:30px;height:30px;border-radius:8px;font-size:17px;border:none}
+  .who:hover{border-color:var(--line2)}
+  .hright{display:flex;gap:8px;align-items:center}
+  .iconbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;color:var(--muted)}
+  .iconbtn:hover{color:var(--text);border-color:var(--line2)}
+
+  .hello{margin-bottom:22px}
+  .hello p{color:var(--muted)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:640px){.grid{grid-template-columns:1fr}}
+  .ticket{
+    position:relative;background:var(--panel);border:1px solid var(--line);border-radius:18px;
+    padding:26px 24px 22px;overflow:hidden;display:flex;flex-direction:column;gap:18px;min-height:220px;
+  }
+  .ticket::before,.ticket::after{
+    content:"";position:absolute;top:50%;width:22px;height:22px;border-radius:50%;background:var(--bg);
+    border:1px solid var(--line);transform:translateY(-50%);
+  }
+  .ticket::before{left:-12px}.ticket::after{right:-12px}
+  .ticket .glow{position:absolute;inset:auto -40% -60% auto;width:260px;height:260px;border-radius:50%;filter:blur(60px);opacity:.5;pointer-events:none}
+  .ticket.cc .glow{background:var(--gold-soft)}
+  .ticket.pa .glow{background:var(--amber-soft)}
+  .tname{font-family:"Bebas Neue",sans-serif;font-size:40px;letter-spacing:.05em;line-height:1}
+  .ticket.cc .tname{color:var(--gold)}
+  .ticket.pa .tname{color:var(--amber)}
+  .tsub{color:var(--muted);font-size:13px;margin-top:4px}
+  .count{display:flex;align-items:baseline;gap:8px;margin-top:auto}
+  .count b{font-family:"Bebas Neue",sans-serif;font-size:48px;font-weight:400;line-height:1}
+  .count span{color:var(--muted);font-size:13px}
+  .perf{border-top:1px dashed var(--line2);margin:0 -24px}
+  .take{width:100%;padding:14px;border-radius:12px;font-weight:600;color:#0a0a0a;transition:transform .12s,filter .2s}
+  .ticket.cc .take{background:var(--gold)}
+  .ticket.pa .take{background:var(--amber)}
+  .take:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .take:disabled{background:var(--panel2)!important;color:var(--dim);cursor:not-allowed;transform:none;filter:none}
+
+  .section{margin-top:40px}
+  .section h3{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:12px}
+  .hist{display:flex;flex-direction:column;gap:8px}
+  .hrow{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:left;width:100%}
+  .hrow:hover{border-color:var(--line2)}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .hrow .k{font-family:"JetBrains Mono",monospace;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hrow .t{color:var(--muted);font-size:12px;white-space:nowrap}
+  .empty{color:var(--dim);font-size:14px;padding:18px;border:1px dashed var(--line);border-radius:12px;text-align:center}
+  .status{color:var(--muted);font-size:13px;text-align:center;margin-top:14px;min-height:20px}
+
+  /* Modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+  .overlay.on{display:flex;animation:fade .2s ease}
+  .modal{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--line2);border-radius:20px;padding:30px 26px 24px;text-align:center;position:relative;animation:pop .28s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes pop{from{transform:scale(.92);opacity:0}to{transform:none;opacity:1}}
+  .modal .mk{font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-weight:600}
+  .codebox{
+    margin:18px 0 8px;padding:20px 14px;border-radius:14px;background:#000;border:1px dashed var(--line2);
+    font-family:"JetBrains Mono",monospace;font-weight:700;font-size:24px;letter-spacing:.08em;word-break:break-all;user-select:all
+  }
+  .modal .meta{color:var(--muted);font-size:12px;margin-bottom:20px}
+  .mbtns{display:flex;gap:10px}
+  .mbtns .btn{flex:1}
+
+  /* Admin */
+  .panel{width:100%;max-width:560px;max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:20px;padding:24px;text-align:left}
+  .panel h2{margin-bottom:4px}
+  .panel .blk{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+  .panel label{display:block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px}
+  .panel textarea,.panel select,.panel .tin{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;outline:none}
+  .panel textarea{min-height:110px;font-family:"JetBrains Mono",monospace;font-size:13px;resize:vertical}
+  .panel textarea:focus,.panel select:focus,.panel .tin:focus{border-color:var(--gold)}
+  .row{display:flex;gap:8px;align-items:center}
+  .row>*{flex:1}
+  .stack{display:flex;flex-direction:column;gap:8px}
+  .seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+  .seg button{flex:1;padding:8px;border-radius:7px;color:var(--muted);font-size:13px;font-weight:600}
+  .seg button.on{background:var(--panel2);color:var(--text)}
+  .stock{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;margin-top:10px}
+  .srow{display:flex;align-items:center;gap:10px;font-size:13px;padding:8px 10px;background:var(--bg);border-radius:8px}
+  .srow .k{font-family:"JetBrains Mono",monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .srow .s{color:var(--muted);font-size:12px;white-space:nowrap}
+  .srow .x{color:var(--dim);padding:2px 6px;border-radius:6px}
+  .srow .x:hover{color:var(--red);background:rgba(229,72,77,.1)}
+  .ok{color:#3dd68c;font-size:13px;min-height:18px}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--panel2);border:1px solid var(--line2);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:60}
+  .toast.on{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+
+<!-- 1. Mot de passe -->
+<section id="lock" class="screen on">
+  <form class="pwbar" id="lockForm">
+    <input id="pw" type="password" placeholder="Mot de passe" autocomplete="current-password" autofocus>
+    <button id="pwBtn" type="submit" aria-label="Entrer">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+  </form>
+  <div class="err" id="pwErr"></div>
+</section>
+
+<!-- 2. Profils -->
+<section id="profiles" class="screen">
+  <h2>Qui regarde&nbsp;?</h2>
+  <div class="plist" id="plist"></div>
+</section>
+
+<!-- 3. Codes -->
+<section id="app" class="screen">
+  <div class="wrap">
+    <header>
+      <div class="brand">CINÉ<span>·</span>CODES</div>
+      <div class="hright">
+        <button class="iconbtn" id="adminBtn" title="Gérer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <button class="who" id="whoBtn" title="Changer de profil"></button>
+        <button class="iconbtn" id="logoutBtn" title="Se déconnecter">⏻</button>
+      </div>
+    </header>
+
+    <div class="hello"><h2 id="helloT"></h2><p>Choisissez votre type de place. Un code récupéré disparaît pour tout le monde.</p></div>
+
+    <div class="films" id="films" style="display:none">
+      <div class="fhead"><h3>À l'affiche en France</h3><span>Données TMDB</span></div>
+      <div class="strip" id="strip"></div>
+    </div>
+
+    <div class="grid">
+      <div class="ticket cc">
+        <div class="glow"></div>
+        <div><div class="tname">CinéChèque</div><div class="tsub">Valable dans les cinémas partenaires</div></div>
+        <div class="count"><b id="ccN">–</b><span>disponible(s)</span></div>
+        <div class="perf"></div>
+        <button class="take" id="ccBtn" disabled>Prendre un code</button>
+      </div>
+      <div class="ticket pa">
+        <div class="glow"></div>
+        <div><div class="tname">Pathé</div><div class="tsub">Valable dans les cinémas Pathé</div></div>
+        <div class="count"><b id="paN">–</b><span>disponible(s)</span></div>
+        <div class="perf"></div>
+        <button class="take" id="paBtn" disabled>Prendre un code</button>
+      </div>
+    </div>
+    <div class="status" id="status"></div>
+
+    <div class="section">
+      <h3>Mes codes récupérés</h3>
+      <div class="hist" id="hist"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Pop-up code -->
+<div class="overlay" id="codeOv">
+  <div class="modal">
+    <div class="mk" id="mType"></div>
+    <div class="codebox" id="mCode"></div>
+    <div class="meta" id="mMeta"></div>
+    <div class="mbtns">
+      <button class="btn ghost" id="mClose">Fermer</button>
+      <button class="btn" id="mCopy">Copier</button>
+    </div>
+  </div>
+</div>
+
+<!-- Gestion -->
+<div class="overlay" id="admOv">
+  <div class="panel">
+    <div class="row" style="align-items:flex-start">
+      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de codes, profils et stock.</p></div>
+      <button class="iconbtn" id="admClose" style="flex:none">✕</button>
+    </div>
+
+    <div id="admLogin" class="blk">
+      <label>Mot de passe de gestion</label>
+      <form class="row" id="admForm">
+        <input class="tin" id="admPw" type="password" placeholder="Mot de passe admin">
+        <button class="btn small" style="flex:none" type="submit">Valider</button>
+      </form>
+      <div class="ok" id="admErr" style="color:var(--red)"></div>
+    </div>
+    <div id="admBody">
+    <div class="blk">
+      <label>Ajouter des codes</label>
+      <div class="stack">
+        <div class="seg" id="addType"><button data-t="cinecheque" class="on">CinéChèque</button><button data-t="pathe">Pathé</button></div>
+        <textarea id="addCodes" placeholder="Un code par ligne"></textarea>
+        <button class="btn small" id="addBtn">Ajouter</button>
+        <div class="ok" id="addOk"></div>
+      </div>
+    </div>
+
+    <div class="blk">
+      <label>Profils</label>
+      <div class="stack" id="profEdit"></div>
+      <button class="btn small ghost" id="profSave" style="margin-top:10px;width:100%">Enregistrer les profils</button>
+      <div class="ok" id="profOk"></div>
+    </div>
+
+    <div class="blk">
+      <label>Stock</label>
+      <div class="seg" id="stockType"><button data-t="cinecheque" class="on">CinéChèque</button><button data-t="pathe">Pathé</button></div>
+      <div class="stock" id="stock"></div>
+    </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="filmOv">
+  <div class="modal fmodal">
+    <div class="poster" id="fPoster"></div>
+    <div style="flex:1;min-width:0">
+      <h4 id="fTitle"></h4>
+      <div class="fmeta" id="fMeta"></div>
+      <div class="syn" id="fSyn"></div>
+      <div class="fbtns">
+        <button id="fCC" style="background:var(--gold)">Code CinéChèque</button>
+        <button id="fPA" style="background:var(--amber)">Code Pathé</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

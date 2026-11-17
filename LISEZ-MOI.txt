@@ -1,0 +1,21 @@
+CINÉ CODES — INSTALLATION SUR HOSTINGER
+=======================================
+
+1. Dans hPanel, ouvrez « Gestionnaire de fichiers » de votre site.
+2. Allez dans le dossier public_html (ou un sous-dossier, ex. public_html/cine).
+3. Envoyez le fichier cine-codes.zip puis faites clic droit > « Extraire ».
+   Vous devez obtenir : index.html, app.js, api.php, config.php, et le dossier data/.
+4. Ouvrez config.php et changez :
+     SITE_PASSWORD  = le mot de passe pour entrer sur le site
+     ADMIN_PASSWORD = le mot de passe du menu « Gestion » (roue dentée)
+5. Ouvrez votre site, entrez le mot de passe, choisissez un profil,
+   puis cliquez sur la roue dentée > mot de passe admin > collez vos codes (un par ligne).
+
+Bon à savoir
+- Aucune base de données à créer : tout est enregistré dans data/db.php
+  (créé automatiquement, illisible depuis le web).
+- Pour sauvegarder vos codes, téléchargez data/db.php de temps en temps.
+- PHP 7.4 ou plus récent est requis (c'est le cas par défaut chez Hostinger).
+- Activez le HTTPS (SSL gratuit dans hPanel) pour que le mot de passe circule chiffré.
+- Si « Impossible d'écrire dans le dossier data/ » s'affiche :
+  clic droit sur data > Permissions > 755.
