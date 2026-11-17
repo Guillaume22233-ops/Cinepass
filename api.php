@@ -73,7 +73,8 @@ function avail_count($db, $type) {
 /** Réglages du site : e-mail d'alerte et liens vers les programmes des cinémas. */
 function site_settings($db) {
     $s = $db['site'] ?? [];
-    return ['email' => (string)($s['email'] ?? ''), 'links' => array_values($s['links'] ?? []), 'alertSent' => $s['alertSent'] ?? []];
+    return ['email' => (string)($s['email'] ?? ''), 'links' => array_values($s['links'] ?? []), 'alertSent' => $s['alertSent'] ?? [],
+            'giftRate' => isset($s['giftRate']) ? (int)$s['giftRate'] : 10];
 }
 /** L'alerte « dernière place » est envoyée une seule fois ; elle se réarme quand le stock repasse au-dessus d'une place. */
 function rearm_alerts(&$db) {
@@ -100,6 +101,16 @@ const COND_TEXT = [
     'pathe'      => "Valable pour une séance standard. Tout supplément (3D, IMAX, 4DX…) est à régler en plus sur place.",
 ];
 const TYPE_LABELS = ['cinecheque' => 'CinéChèque', 'pathe' => 'Pathé'];
+
+/** Les affiches passent par notre serveur (api.php?a=poster) : plus fiable sur mobile que image.tmdb.org en direct. */
+function local_posters($films) {
+    foreach ($films as &$f) {
+        if (!empty($f['poster']) && preg_match('#/t/p/w\d+(/[A-Za-z0-9_\-]+\.(?:jpg|jpeg|png|webp))$#', $f['poster'], $m)) {
+            $f['poster'] = 'api.php?a=poster&p=' . rawurlencode($m[1]);
+        }
+    }
+    return $films;
+}
 
 function need_login() { if (empty($_SESSION['ok'])) out(['error' => 'auth'], 401); }
 function need_admin() { need_login(); if (empty($_SESSION['admin'])) out(['error' => 'admin'], 403); }
@@ -183,6 +194,14 @@ case 'claim':
         $c['takenAt'] = time() * 1000;
         $c['price'] = pay_settings($db)['price'][$type];
         $c['paid'] = false;
+        // Tirage au sort de l'ange : 1 chance sur N que la place soit offerte (0 = jamais)
+        $rate = site_settings($db)['giftRate'];
+        if ($rate > 0 && random_int(1, $rate) === 1) {
+            $c['price'] = 0;
+            $c['paid'] = true;
+            $c['paidAt'] = $c['takenAt'];
+            $c['offered'] = true;
+        }
         $taken = $c;
         $site = site_settings($db);
         $left = avail_count($db, $type);
@@ -264,10 +283,18 @@ case 'films':
     need_login();
     if (!defined('TMDB_KEY') || TMDB_KEY === '') out(['films' => []]);
     $cache = __DIR__ . '/data/films.php';
-    if (is_file($cache) && time() - filemtime($cache) < 6 * 3600) {
+    $tryFile = __DIR__ . '/data/films.try';
+    // Mise à jour une fois par semaine : le mercredi à partir de 8 h (jour des sorties en France)
+    $lastWed = strtotime('wednesday this week 08:00');
+    if ($lastWed > time()) $lastWed -= 7 * 86400;
+    $fresh = is_file($cache) && filemtime($cache) >= $lastWed;
+    // En cas d'échec chez TMDB, on ne réessaie qu'une fois par heure (pour ne pas ralentir le site)
+    $recentTry = is_file($tryFile) && time() - filemtime($tryFile) < 3600;
+    if ($fresh || (is_file($cache) && $recentTry)) {
         $raw = substr(file_get_contents($cache), strlen(DB_GUARD));
-        out(['films' => json_decode($raw, true) ?: []]);
+        out(['films' => local_posters(json_decode($raw, true) ?: [])]);
     }
+    @touch($tryFile);
     $long = strlen(TMDB_KEY) > 40; // jeton v4 (Bearer) ou clé v3
     $url = 'https://api.themoviedb.org/3/movie/now_playing?language=fr-FR&region=FR&page=1'
          . ($long ? '' : '&api_key=' . urlencode(TMDB_KEY));
@@ -287,7 +314,7 @@ case 'films':
     $data = $body ? json_decode($body, true) : null;
     if (!$data || empty($data['results'])) {
         // En cas d'échec, on garde l'ancienne liste si elle existe
-        if (is_file($cache)) out(['films' => json_decode(substr(file_get_contents($cache), strlen(DB_GUARD)), true) ?: []]);
+        if (is_file($cache)) out(['films' => local_posters(json_decode(substr(file_get_contents($cache), strlen(DB_GUARD)), true) ?: [])]);
         out(['films' => []]);
     }
     $res = $data['results'];
@@ -303,7 +330,39 @@ case 'films':
         ];
     }
     @file_put_contents($cache, DB_GUARD . json_encode($films, JSON_UNESCAPED_UNICODE));
-    out(['films' => $films]);
+    out(['films' => local_posters($films)]);
+
+case 'poster':
+    // Récupère l'affiche chez TMDB une seule fois, la garde dans data/posters et la sert depuis notre domaine.
+    need_login();
+    $p = rawurldecode((string)($_GET['p'] ?? ''));
+    if (!preg_match('#^/[A-Za-z0-9_\-]+\.(jpg|jpeg|png|webp)$#', $p, $m)) { http_response_code(400); exit; }
+    $dir = __DIR__ . '/data/posters';
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    $file = $dir . $p;
+    if (!is_file($file) || filesize($file) < 100) {
+        $url = 'https://image.tmdb.org/t/p/w342' . $p;
+        $img = false;
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_FOLLOWLOCATION => true]);
+            $img = curl_exec($ch);
+            if (curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 200) $img = false;
+            curl_close($ch);
+        } else {
+            $img = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 10]]));
+        }
+        if (!$img || strlen($img) < 100) { http_response_code(404); exit; }
+        @file_put_contents($file, $img);
+        // petit ménage : affiches de plus de 60 jours
+        foreach (glob($dir . '/*') ?: [] as $old) if (filemtime($old) < time() - 60 * 86400) @unlink($old);
+    }
+    $mime = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'][strtolower($m[1])];
+    header('Content-Type: ' . $mime);
+    header('Cache-Control: private, max-age=604800');
+    header('Content-Length: ' . filesize($file));
+    readfile($file);
+    exit;
 
 case 'pdf':
     // Le PDF n'est accessible qu'au profil qui a réservé la place, ou à l'admin.
@@ -349,7 +408,8 @@ case 'admin_state':
         $codes = $db['codes'];
         foreach ($codes as &$c) if ($c['taken']) $c['price'] = code_price($c, $pay);
         $site = site_settings($db);
-        return [['codes' => $codes, 'profiles' => $db['profiles'], 'pay' => $pay, 'site' => $site, 'today' => date('Y-m-d')], false];
+        $faces = [1 => (bool)glob(__DIR__ . '/data/ange1.*'), 2 => (bool)glob(__DIR__ . '/data/ange2.*')];
+        return [['codes' => $codes, 'profiles' => $db['profiles'], 'pay' => $pay, 'site' => $site, 'today' => date('Y-m-d'), 'faces' => $faces], false];
     }));
 
 case 'admin_paid':      // marque comme réglés tous les codes d'un profil
@@ -394,9 +454,11 @@ case 'admin_site_settings':
         $links[] = ['name' => $name, 'url' => $url];
         if (count($links) >= 12) break;
     }
-    with_db(function (&$db) use ($email, $links) {
-        $db['site']['email'] = $email;
-        $db['site']['links'] = $links;
+    $gift = array_key_exists('giftRate', $in) ? max(0, min(100, (int)$in['giftRate'])) : null;
+    $keepEmail = !array_key_exists('email', $in);
+    with_db(function (&$db) use ($email, $links, $gift, $keepEmail) {
+        if (!$keepEmail) { $db['site']['email'] = $email; $db['site']['links'] = $links; }
+        if ($gift !== null) $db['site']['giftRate'] = $gift;
         return [null, true];
     });
     out(['ok' => true]);
@@ -407,6 +469,44 @@ case 'admin_test_mail':
     if ($email === '') out(['error' => "Enregistrez d'abord une adresse e-mail"], 400);
     $ok = send_mail($email, 'Ciné Codes : e-mail de test', "Si vous lisez ce message, les alertes « dernière place » de Ciné Codes fonctionnent 🎟️");
     out($ok ? ['ok' => true] : ['error' => "Le serveur n'a pas pu envoyer l'e-mail"], $ok ? 200 : 500);
+
+case 'admin_upload_face':
+    need_admin();
+    $n = (int)($_POST['n'] ?? 0);
+    if ($n !== 1 && $n !== 2) out(['error' => 'Photo inconnue'], 400);
+    $f = $_FILES['file'] ?? null;
+    if (!$f || $f['error'] !== UPLOAD_ERR_OK) out(['error' => 'Envoi échoué (image trop lourde ?)'], 400);
+    if ($f['size'] > 5 * 1024 * 1024) out(['error' => 'Image trop lourde (5 Mo max)'], 400);
+    $info = @getimagesize($f['tmp_name']);
+    $exts = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_WEBP => 'webp', IMAGETYPE_GIF => 'gif'];
+    if (!$info || !isset($exts[$info[2]])) out(['error' => 'Format accepté : JPG, PNG, WEBP ou GIF'], 400);
+    foreach (glob(__DIR__ . "/data/ange$n.*") ?: [] as $old) @unlink($old);
+    if (!move_uploaded_file($f['tmp_name'], __DIR__ . "/data/ange$n." . $exts[$info[2]])) out(['error' => "Impossible d'enregistrer l'image"], 500);
+    out(['ok' => true]);
+
+case 'admin_delete_face':
+    need_admin();
+    $n = (int)($in['n'] ?? 0);
+    if ($n === 1 || $n === 2) foreach (glob(__DIR__ . "/data/ange$n.*") ?: [] as $old) @unlink($old);
+    out(['ok' => true]);
+
+case 'face':
+    need_login();
+    $n = (int)($_GET['n'] ?? 0);
+    $files = ($n === 1 || $n === 2) ? (glob(__DIR__ . "/data/ange$n.*") ?: []) : [];
+    if (!$files) { header('Content-Type: text/plain'); http_response_code(404); echo 'Pas de photo'; exit; }
+    $mime = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif'][pathinfo($files[0], PATHINFO_EXTENSION)] ?? 'application/octet-stream';
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($files[0]));
+    header('Cache-Control: private, max-age=86400');
+    readfile($files[0]);
+    exit;
+
+case 'admin_refresh_films':
+    need_admin();
+    @unlink(__DIR__ . '/data/films.php');
+    @unlink(__DIR__ . '/data/films.try');
+    out(['ok' => true]);
 
 case 'admin_set_expiry':
     need_admin();

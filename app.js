@@ -49,6 +49,36 @@
   function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("on"),2600); }
   const initials = n => (n.trim().split(/\s+/).map(w=>w[0]).join("").slice(0,2) || "?").toUpperCase();
   const avatarHtml = (i, n) => { const [fg,bg]=COLORS[i%COLORS.length]; return `<div class="avatar" style="color:${fg};background:${bg}">${esc(initials(n))}</div>`; };
+  const FACE_PH = {
+    1: "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#ffe1c6"/><path d="M14 40 C16 14 84 14 86 40 C78 26 22 26 14 40Z" fill="#6b4a32"/><circle cx="35" cy="50" r="5" fill="#2b2b2b"/><circle cx="65" cy="50" r="5" fill="#2b2b2b"/><path d="M36 70 Q50 78 64 70" stroke="#2b2b2b" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="24" cy="64" r="6" fill="#ffb3a7" opacity=".7"/><circle cx="76" cy="64" r="6" fill="#ffb3a7" opacity=".7"/></svg>'),
+    2: "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#ffe1c6"/><path d="M14 40 C16 14 84 14 86 40 C78 26 22 26 14 40Z" fill="#6b4a32"/><path d="M29 50 Q35 44 41 50" stroke="#2b2b2b" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="65" cy="49" r="5" fill="#2b2b2b"/><path d="M30 64 Q50 90 70 64 Z" fill="#7a2b2b"/><path d="M36 66 L64 66 L62 70 L38 70Z" fill="#fff"/><circle cx="22" cy="62" r="7" fill="#ffb3a7" opacity=".8"/><circle cx="78" cy="62" r="7" fill="#ffb3a7" opacity=".8"/></svg>'),
+  };
+  let faceVer = Date.now();
+  const faceUrl = n => window.CC_FACE_URL ? window.CC_FACE_URL(n) : "api.php?a=face&n=" + n + "&t=" + faceVer;
+  function setFace(img, n){
+    const u = faceUrl(n);
+    img.onerror = () => { img.onerror = null; img.src = FACE_PH[n]; };
+    img.src = u || FACE_PH[n];
+  }
+
+  /* ---------- L'ange : place offerte ---------- */
+  function playAngel(){
+    return new Promise(resolve => {
+      const el = $("angel");
+      setFace($("angFace1"), 1); setFace($("angFace2"), 2);
+      el.classList.remove("arrived", "leave", "on"); void el.offsetWidth;
+      el.classList.add("on");
+      let done = false, ready = false;
+      const finish = () => {
+        if (done || !ready) return; done = true;
+        el.classList.add("leave");
+        setTimeout(() => { el.classList.remove("on", "arrived", "leave"); resolve(); }, 450);
+      };
+      setTimeout(() => { el.classList.add("arrived"); setTimeout(() => { ready = true; }, 600); setTimeout(() => { ready = true; finish(); }, 4200); }, 2300);
+      el.onclick = finish;
+    });
+  }
+
   const pdfUrl = (id, dl) => window.CC_PDF_URL ? window.CC_PDF_URL(id, dl) : "api.php?a=pdf&id=" + encodeURIComponent(id) + (dl ? "&dl=1" : "");
   const dfr = d => d ? new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { day:"numeric", month:"short", year:"numeric" }) : "";
   const daysLeft = (d, today) => Math.round((new Date(d + "T12:00:00") - new Date((today || new Date().toISOString().slice(0,10)) + "T12:00:00")) / 86400000);
@@ -84,9 +114,10 @@
   const HUES = [32, 0, 210, 265, 150, 45, 190, 330];
   const fdate = d => d ? new Date(d).toLocaleDateString("fr-FR",{day:"numeric",month:"long"}) : "";
   function posterHtml(f, i, rank){
-    const style = f.poster ? `background-image:url('${esc(f.poster)}')` :
-      `background:linear-gradient(160deg,hsl(${HUES[i%HUES.length]} 45% 26%),#0c0c0e 85%)`;
-    return `<div class="poster" style="${style}">${f.poster ? "" : `<div class="ph">${esc(f.title)}</div>`}${rank ? `<div class="rank">${rank}</div>` : ""}</div>`;
+    // Dégradé + titre toujours présents en fond ; l'affiche (img) se pose dessus si elle se charge.
+    const bg = `background:linear-gradient(160deg,hsl(${HUES[i%HUES.length]} 45% 26%),#0c0c0e 85%)`;
+    const img = f.poster ? `<img class="pimg" src="${esc(f.poster)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : "";
+    return `<div class="poster" style="${bg}"><div class="ph">${esc(f.title)}</div>${img}${rank ? `<div class="rank">${rank}</div>` : ""}</div>`;
   }
   async function loadFilms(){
     if (films) return;
@@ -178,7 +209,9 @@
 
     $("hist").innerHTML = mine.length ? mine.map((c,k) => {
       const T = TYPES[c.type] || {label:c.type,color:"var(--muted)"};
-      return `<div class="hrow" data-k="${k}" role="button" tabindex="0"><span class="dot" style="background:${T.color}"></span><span class="k">${c.file ? "📄 " : ""}${esc(c.code)}</span><span class="t">${esc(T.label)} · ${eur(c.price)} · ${fmt(c.takenAt)}${c.expires ? ` · <span class="exp ${daysLeft(c.expires) < 0 ? "gone" : daysLeft(c.expires) <= 14 ? "soon" : ""}">valable jusqu'au ${dfr(c.expires)}</span>` : ""}</span>${c.paid
+      return `<div class="hrow" data-k="${k}" role="button" tabindex="0"><span class="dot" style="background:${T.color}"></span><span class="k">${c.file ? "📄 " : ""}${esc(c.code)}</span><span class="t">${esc(T.label)} · ${eur(c.price)} · ${fmt(c.takenAt)}${c.expires ? ` · <span class="exp ${daysLeft(c.expires) < 0 ? "gone" : daysLeft(c.expires) <= 14 ? "soon" : ""}">valable jusqu'au ${dfr(c.expires)}</span>` : ""}</span>${c.offered
+        ? `<span class="badge gift">Offerte 🎁</span>`
+        : c.paid
         ? `<button class="badge ok" data-undo="${esc(c.id)}" title="Annuler">Remboursé ✓</button>`
         : `<button class="paybtn" data-pay="${esc(c.id)}">J'ai remboursé</button>`}</div>`;
     }).join("") : `<div class="empty">Aucune place réservée pour l'instant.</div>`;
@@ -204,6 +237,8 @@
     busy = true; render(); $("status").textContent = "Récupération du code…";
     try {
       const r = await api("claim", { type });
+      $("status").textContent = "";
+      if (r.code.offered) await playAngel();
       openCode(r.code);
     } catch(e){ toast(e.error || "Erreur, réessayez."); }
     busy = false;
@@ -274,7 +309,7 @@
       $("mOpen").href = pdfUrl(c.id, false);
       $("mDl").href = pdfUrl(c.id, true);
     }
-    $("mMeta").innerHTML = esc("Récupéré par " + (c.takenBy || profile) + (c.takenAt ? " · " + fmt(c.takenAt) : ""))
+    $("mMeta").innerHTML = esc("Récupéré par " + (c.takenBy || profile) + (c.takenAt ? " · " + fmt(c.takenAt) : "")) + (c.offered ? ` · <b style="color:#5b3fc4">Offerte 🎁</b>` : "")
       + (c.expires ? `<br><span class="exp ${daysLeft(c.expires) <= 14 ? "soon" : ""}" style="font-size:12px">Valable jusqu'au ${dfr(c.expires)}</span>` : "");
     $("mCopy").textContent = "Copier";
     $("codeOv").classList.add("on");
@@ -322,6 +357,8 @@
     const site = r.site || { email:"", links:[] };
     if (document.activeElement !== $("alertEmail")) $("alertEmail").value = site.email || "";
     renderAlerts();
+    if (document.activeElement !== $("giftRate")) $("giftRate").value = site.giftRate ?? 10;
+    faceVer = Date.now(); setFace($("adFace1"), 1); setFace($("adFace2"), 2);
     if (document.activeElement === null || !document.activeElement.closest || !document.activeElement.closest(".pgrid")) {
       $("pCC").value = String(admPay.price.cinecheque).replace(".", ","); $("pPA").value = String(admPay.price.pathe).replace(".", ",");
       $("fCCp").value = String(admPay.full.cinecheque).replace(".", ","); $("fPAp").value = String(admPay.full.pathe).replace(".", ",");
@@ -352,6 +389,36 @@
       $("siteOk").style.color = ""; $("siteOk").textContent = "Enregistré ✓";
       await loadAdmin();
     } catch(e){ $("siteOk").style.color = "var(--red)"; $("siteOk").textContent = e.error || "Erreur"; }
+  };
+  $("giftSave").onclick = async () => {
+    const v = parseInt($("giftRate").value, 10);
+    if (isNaN(v) || v < 0 || v > 100) { $("giftOk").style.color = "var(--red)"; $("giftOk").textContent = "Entre un nombre entre 0 et 100."; return; }
+    try { await api("admin_site_settings", { giftRate: v }); $("giftOk").style.color = ""; $("giftOk").textContent = v ? `Enregistré ✓ : 1 réservation sur ${v} est offerte` : "Enregistré ✓ : l'ange est désactivé"; $("giftRate").blur(); }
+    catch(e){ $("giftOk").style.color = "var(--red)"; $("giftOk").textContent = e.error || "Erreur"; }
+  };
+  [1, 2].forEach(n => $("faceIn" + n).addEventListener("change", async () => {
+    const f = $("faceIn" + n).files[0]; if (!f) return;
+    $("giftOk").style.color = ""; $("giftOk").textContent = "Envoi de la photo…";
+    const fd = new FormData(); fd.append("n", n); fd.append("file", f);
+    try {
+      const r = await fetch("api.php?a=admin_upload_face", { method: "POST", body: fd, credentials: "same-origin" });
+      let d = {}; try { d = await r.json(); } catch(e){ d = { error: "Réponse invalide (image trop lourde ?)" }; }
+      if (!r.ok) throw d;
+      faceVer = Date.now(); setFace($("adFace" + n), n);
+      $("giftOk").textContent = "Photo enregistrée ✓";
+    } catch(e){ $("giftOk").style.color = "var(--red)"; $("giftOk").textContent = e.error || "Erreur"; }
+    $("faceIn" + n).value = "";
+  }));
+  $("angelTest").onclick = async () => { $("admOv").classList.remove("on"); await playAngel(); $("admOv").classList.add("on"); };
+
+  $("filmsRefresh").onclick = async () => {
+    $("filmsOk").style.color = ""; $("filmsOk").textContent = "Mise à jour…";
+    try {
+      await api("admin_refresh_films");
+      films = null; $("strip").innerHTML = ""; $("films").style.display = "none";
+      await loadFilms();
+      $("filmsOk").textContent = (films && films.length) ? `${films.length} films à l'affiche ✓` : "Aucun film reçu (clé TMDB ?)";
+    } catch(e){ $("filmsOk").style.color = "var(--red)"; $("filmsOk").textContent = e.error || "Erreur"; }
   };
   $("testMail").onclick = async () => {
     $("siteOk").style.color = ""; $("siteOk").textContent = "Envoi du test…";
@@ -396,7 +463,7 @@
     $("sum").querySelectorAll(".chip").forEach(b => b.onclick = () => { logFilter = b.dataset.p || null; renderLog(); });
     const rows = taken.filter(c => logFilter === null || c.takenBy === logFilter);
     $("hlog").innerHTML = rows.length ? rows.map(c => { const T = TYPES[c.type] || {label:c.type,color:"var(--muted)"};
-      return `<div class="lrow"><span class="who2">${esc(c.takenBy || "?")}</span><span class="ty" style="color:${T.color}">${esc(T.label)} · ${eur(c.price)}</span><span class="d">${fmt(c.takenAt)}</span><span class="k">${c.file?"📄 ":""}${esc(c.code)}</span><button class="badge ${c.paid?"ok":"due"}" data-tp="${esc(c.id)}" title="Cliquer pour changer" style="grid-column:3;grid-row:2;justify-self:end">${c.paid?"Réglé":"À régler"}</button></div>`; }).join("")
+      return `<div class="lrow"><span class="who2">${esc(c.takenBy || "?")}</span><span class="ty" style="color:${T.color}">${esc(T.label)} · ${eur(c.price)}</span><span class="d">${fmt(c.takenAt)}</span><span class="k">${c.file?"📄 ":""}${esc(c.code)}</span>${c.offered ? `<span class="badge gift" style="grid-column:3;grid-row:2;justify-self:end">Offerte 🎁</span>` : `<button class="badge ${c.paid?"ok":"due"}" data-tp="${esc(c.id)}" title="Cliquer pour changer" style="grid-column:3;grid-row:2;justify-self:end">${c.paid?"Réglé":"À régler"}</button>`}</div>`; }).join("")
       : `<div class="empty">Aucune place prise pour l'instant.</div>`;
     $("hlog").querySelectorAll("[data-tp]").forEach(b => b.onclick = async () => {
       try { await api("admin_toggle_paid", { id: b.dataset.tp }); await loadAdmin(); await refresh(); } catch(e){ toast(e.error || "Erreur"); }

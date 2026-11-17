@@ -85,6 +85,7 @@
   .film{flex:none;width:118px;scroll-snap-align:start;text-align:left;display:flex;flex-direction:column;align-self:flex-start}
   .poster{position:relative;aspect-ratio:2/3;border-radius:10px;background:#1a1a1f center/cover no-repeat;border:1px solid var(--line);overflow:hidden;transition:transform .2s,border-color .2s}
   .film:hover .poster{transform:translateY(-3px);border-color:var(--line2)}
+  .poster .pimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
   .poster .ph{position:absolute;inset:0;display:flex;align-items:flex-end;padding:10px;font-family:"Bebas Neue",sans-serif;font-size:20px;line-height:1.05;letter-spacing:.03em}
   .rank{position:absolute;left:6px;top:2px;font-family:"Bebas Neue",sans-serif;font-size:34px;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.8)}
   .ftitle{font-size:13px;font-weight:500;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -326,8 +327,8 @@
   :root{
     --bg:#eef6fd; --panel:rgba(255,255,255,.86); --panel2:#f2f7fc; --line:rgba(25,60,110,.12); --line2:rgba(25,60,110,.24);
     --text:#14263d; --muted:#56687f; --dim:#8797ab;
-    --gold:#c08a12; --gold-soft:rgba(192,138,18,.12);
-    --amber:#e0730c; --amber-soft:rgba(224,115,12,.12);
+    --gold:#2f6fe0; --gold-soft:rgba(47,111,224,.12);
+    --amber:#7c5ce0; --amber-soft:rgba(124,92,224,.12);
     --red:#d93b41;
   }
   body{background:#9ccbf2;background-image:none;color:var(--text)}
@@ -358,8 +359,8 @@
   .ticket .glow{display:none}
   .perf{border-top-color:rgba(25,60,110,.18)}
   .take{color:#fff;box-shadow:0 6px 16px rgba(30,80,140,.18)}
-  .ticket.cc .take{background:#d9a21f}
-  .ticket.pa .take{background:#ef8417}
+  .ticket.cc .take{background:#2f6fe0}
+  .ticket.pa .take{background:#7c5ce0}
   .btn{background:var(--text);color:#fff}
   .btn.ghost{background:rgba(255,255,255,.7);color:var(--text)}
   .pwbar{padding-left:24px}
@@ -385,11 +386,11 @@
   .alertbar div.red{color:#9c1f24}
   .srow input[type=date],.panel input[type=date]{color-scheme:light}
   .tlr a{background:#fff}
-  .ticket.cc .tlr a{color:#a6760b;border-color:rgba(192,138,18,.45)}
-  .ticket.pa .tlr a{color:#c45f06;border-color:rgba(224,115,12,.45)}
+  .ticket.cc .tlr a{color:#1f56b8;border-color:rgba(47,111,224,.45)}
+  .ticket.pa .tlr a{color:#5b3fc4;border-color:rgba(124,92,224,.45)}
   .tname{text-shadow:none}
-  .ticket.cc .tname{color:#c08a12}
-  .ticket.pa .tname{color:#e0730c}
+  .ticket.cc .tname{color:#2f6fe0}
+  .ticket.pa .tname{color:#7c5ce0}
   .wamt.zero{color:#1a9c5f}
   .wsub b{color:#1a9c5f}
   .badge.ok{color:#1a9c5f;background:rgba(26,156,95,.12)}
@@ -403,12 +404,60 @@
   .seg button:not(.on):hover{background:rgba(255,255,255,.7);color:#14263d}
   .seg button.on{color:#fff;box-shadow:0 4px 12px rgba(20,38,61,.18)}
   .seg button.on::before{content:"✓ ";font-weight:700}
-  .seg button.on[data-t=cinecheque]{background:#d9a21f}
-  .seg button.on[data-t=pathe]{background:#ef8417}
-  .drop[data-t=cinecheque]{border-color:rgba(192,138,18,.55);background:rgba(217,162,31,.07)}
-  .drop[data-t=pathe]{border-color:rgba(224,115,12,.55);background:rgba(239,132,23,.07)}
-  .drop[data-t=cinecheque] #dropType,.drop[data-t=cinecheque] u{color:#a6760b}
-  .drop[data-t=pathe] #dropType,.drop[data-t=pathe] u{color:#c45f06}
+  .seg button.on[data-t=cinecheque]{background:#2f6fe0}
+  .seg button.on[data-t=pathe]{background:#7c5ce0}
+  .drop[data-t=cinecheque]{border-color:rgba(47,111,224,.55);background:rgba(47,111,224,.07)}
+  .drop[data-t=pathe]{border-color:rgba(124,92,224,.55);background:rgba(124,92,224,.07)}
+  .drop[data-t=cinecheque] #dropType,.drop[data-t=cinecheque] u{color:#1f56b8}
+  .drop[data-t=pathe] #dropType,.drop[data-t=pathe] u{color:#5b3fc4}
+
+
+  /* ===== Ange : place offerte ===== */
+  #angel{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(16,36,68,.55);cursor:pointer}
+  #angel.on{display:flex}
+  .ang-glow{position:absolute;width:520px;height:520px;max-width:120vw;max-height:120vw;border-radius:50%;background:radial-gradient(circle,rgba(255,250,225,.85) 0%,rgba(255,244,200,.35) 35%,rgba(255,244,200,0) 70%);opacity:0;transform:scale(.6);transition:opacity .6s,transform .8s}
+  #angel.arrived .ang-glow{opacity:1;transform:scale(1)}
+  .ang-fly{position:relative;transform:translate3d(0,110vh,0)}
+  #angel.on .ang-fly{animation:angRise 2.3s cubic-bezier(.18,.75,.3,1) forwards}
+  @keyframes angRise{from{transform:translate3d(0,110vh,0)}to{transform:translate3d(0,0,0)}}
+  .ang-body{position:relative;width:min(290px,62vw);animation:angFloat 2.6s ease-in-out infinite}
+  @keyframes angFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+  .ang-svg{display:block;width:100%;height:auto;overflow:visible}
+  .wing{transform-box:fill-box;animation:flap .45s ease-in-out infinite alternate}
+  .wl{transform-origin:100% 60%}
+  .wr{transform-origin:0% 60%}
+  @keyframes flap{from{transform:rotate(0) scaleY(1)}to{transform:rotate(-14deg) scaleY(.9)}}
+  .wr{animation-name:flapR}
+  @keyframes flapR{from{transform:rotate(0) scaleY(1)}to{transform:rotate(14deg) scaleY(.9)}}
+  .ang-head{position:absolute;left:50%;top:30.9%;width:36%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;overflow:hidden;background:#ffe1c6;border:4px solid #fff;box-shadow:0 6px 18px rgba(20,40,80,.25)}
+  .ang-head img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:opacity .25s}
+  #angFace2{opacity:0}
+  #angel.arrived #angFace1{opacity:0}
+  #angel.arrived #angFace2{opacity:1}
+  #angel.arrived .ang-head{animation:headPop .45s cubic-bezier(.3,1.6,.5,1)}
+  @keyframes headPop{0%{transform:translate(-50%,-50%) scale(1)}40%{transform:translate(-50%,-50%) scale(1.18) rotate(-6deg)}100%{transform:translate(-50%,-50%) scale(1)}}
+  .ang-halo{position:absolute;left:50%;top:7.5%;width:34%;height:7%;transform:translateX(-50%);border:5px solid #f5c542;border-radius:50%;box-shadow:0 0 14px rgba(245,197,66,.8),inset 0 0 8px rgba(245,197,66,.6);animation:halo 1.6s ease-in-out infinite}
+  @keyframes halo{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-4px)}}
+  .ang-msg{position:relative;margin-top:18px;padding:14px 22px;border-radius:18px;background:#fff;color:#14263d;font-weight:700;font-size:clamp(18px,4.8vw,24px);text-align:center;box-shadow:0 14px 40px rgba(20,40,80,.3);opacity:0;transform:translateY(14px) scale(.85);transition:opacity .35s .1s,transform .45s .1s cubic-bezier(.3,1.5,.5,1)}
+  .ang-msg::before{content:"";position:absolute;top:-9px;left:50%;width:18px;height:18px;background:#fff;transform:translateX(-50%) rotate(45deg);border-radius:3px}
+  .ang-msg span{display:inline-block;animation:gift 1s ease-in-out infinite}
+  @keyframes gift{0%,100%{transform:rotate(0)}25%{transform:rotate(-14deg)}75%{transform:rotate(14deg)}}
+  #angel.arrived .ang-msg{opacity:1;transform:none}
+  .ang-sparks{position:absolute;left:50%;top:42%;width:0;height:0}
+  .ang-sparks i{position:absolute;width:12px;height:12px;margin:-6px;background:#ffd84d;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);opacity:0}
+  #angel.arrived .ang-sparks i{animation:spark .9s ease-out forwards}
+  .ang-sparks i:nth-child(1){--x:-150px;--y:-90px}.ang-sparks i:nth-child(2){--x:150px;--y:-80px}
+  .ang-sparks i:nth-child(3){--x:-120px;--y:40px}.ang-sparks i:nth-child(4){--x:130px;--y:50px}
+  .ang-sparks i:nth-child(5){--x:-40px;--y:-150px}.ang-sparks i:nth-child(6){--x:50px;--y:-140px}
+  .ang-sparks i:nth-child(7){--x:-170px;--y:-20px}.ang-sparks i:nth-child(8){--x:170px;--y:-10px}
+  @keyframes spark{0%{opacity:1;transform:translate(0,0) scale(.4)}70%{opacity:1}100%{opacity:0;transform:translate(var(--x),var(--y)) scale(1.3) rotate(90deg)}}
+  #angel.leave{animation:angOut .45s ease forwards}
+  @keyframes angOut{to{opacity:0}}
+  .badge.gift{background:rgba(124,92,224,.12);color:#5b3fc4}
+  .faces{display:flex;gap:12px}
+  .facebox{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;border-radius:12px;background:var(--bg);border:1px solid var(--line);text-align:center;font-size:12px;color:var(--muted)}
+  .facebox img{width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid #fff;box-shadow:0 4px 12px rgba(20,40,80,.15);background:#ffe1c6}
+  .facebox label{all:unset;cursor:pointer;font-size:12px;font-weight:600;color:var(--text);padding:7px 12px;border-radius:8px;border:1px solid var(--line2);background:#fff}
 
   /* ===== Optimisations mobile ===== */
   .overlay{overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -442,8 +491,8 @@
   .ticket .tlr a,.ticket.cc .tlr a,.ticket.pa .tlr a{background:#14263d;color:#fff;border:none;box-shadow:0 6px 14px rgba(20,38,61,.18)}
   .ticket .tlr a:hover,.ticket.cc .tlr a:hover,.ticket.pa .tlr a:hover{background:#1f3654}
   .ldot{width:9px;height:9px;border-radius:50%;flex:none}
-  .ticket.cc .ldot{background:#e8b84a}
-  .ticket.pa .ldot{background:#f39a45}
+  .ticket.cc .ldot{background:#9cc2ff}
+  .ticket.pa .ldot{background:#cbbcff}
 </style>
 </head>
 <body>
@@ -592,7 +641,7 @@
 <div class="overlay" id="admOv">
   <div class="panel">
     <div class="row" style="align-items:flex-start">
-      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de places, soldes, profils et stock. <span style="color:var(--dim)">· v21</span></p></div>
+      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Ajout de places, soldes, profils et stock. <span style="color:var(--dim)">· v25</span></p></div>
       <button class="iconbtn" id="admClose" style="flex:none">✕</button>
     </div>
 
@@ -656,6 +705,29 @@
     </div>
 
     <div class="blk">
+      <label>L'ange : place offerte au hasard</label>
+      <div class="row" style="gap:10px">
+        <span style="flex:none;font-size:14px;color:var(--muted)">1 réservation sur</span>
+        <input class="tin" type="number" id="giftRate" min="0" max="100" inputmode="numeric" style="max-width:90px">
+        <button class="btn small ghost" id="giftSave" style="flex:none">Enregistrer</button>
+      </div>
+      <div class="hint">La place tirée au sort est offerte (0 €). Mettez 0 pour désactiver l'ange.</div>
+      <div class="faces" style="margin-top:12px">
+        <div class="facebox"><img id="adFace1" alt="">Tête au départ<label>Choisir une photo<input type="file" id="faceIn1" accept="image/*" hidden></label></div>
+        <div class="facebox"><img id="adFace2" alt="">Tête à l'arrivée<label>Choisir une photo<input type="file" id="faceIn2" accept="image/*" hidden></label></div>
+      </div>
+      <button class="btn small" id="angelTest" style="margin-top:10px;width:100%">Tester l'animation</button>
+      <div class="ok" id="giftOk"></div>
+    </div>
+
+    <div class="blk">
+      <label>Films à l'affiche</label>
+      <div class="hint" style="margin-top:0">Mis à jour automatiquement chaque mercredi à partir de 8 h.</div>
+      <button class="btn small ghost" id="filmsRefresh" style="margin-top:10px;width:100%">Mettre à jour maintenant</button>
+      <div class="ok" id="filmsOk"></div>
+    </div>
+
+    <div class="blk">
       <label>Alerte « dernière place »</label>
       <div class="row">
         <input class="tin" type="email" id="alertEmail" placeholder="votre@email.fr">
@@ -696,6 +768,38 @@
   </div>
 </div>
 
+<!-- Ange : place offerte -->
+<div id="angel" aria-live="polite">
+  <div class="ang-glow"></div>
+  <div class="ang-fly">
+    <div class="ang-body">
+      <svg class="ang-svg" viewBox="0 0 300 340" aria-hidden="true">
+        <g class="wing wl">
+          <path d="M120 150 C70 95 18 92 8 128 C26 126 34 132 22 146 C42 142 48 150 34 164 C56 160 62 170 50 182 C76 176 92 186 84 198 C104 190 116 176 122 166 Z" fill="#fff" stroke="#b9cfe8" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M112 156 C86 132 60 124 40 128 M106 166 C84 152 66 150 52 152 M100 176 C88 170 76 170 66 172" stroke="#d3e2f3" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </g>
+        <g class="wing wr">
+          <path d="M180 150 C230 95 282 92 292 128 C274 126 266 132 278 146 C258 142 252 150 266 164 C244 160 238 170 250 182 C224 176 208 186 216 198 C196 190 184 176 178 166 Z" fill="#fff" stroke="#b9cfe8" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M188 156 C214 132 240 124 260 128 M194 166 C216 152 234 150 248 152 M200 176 C212 170 224 170 234 172" stroke="#d3e2f3" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </g>
+        <path d="M150 140 C126 140 114 156 110 176 L88 318 C110 330 190 330 212 318 L190 176 C186 156 174 140 150 140 Z" fill="#fff" stroke="#b9cfe8" stroke-width="2.5"/>
+        <path d="M150 150 L150 316" stroke="#e3edf8" stroke-width="3"/>
+        <path d="M112 186 C96 210 98 234 116 246 M188 186 C204 210 202 234 184 246" stroke="#b9cfe8" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <circle cx="118" cy="248" r="8" fill="#ffe1c6" stroke="#e6bfa0" stroke-width="1.5"/>
+        <circle cx="182" cy="248" r="8" fill="#ffe1c6" stroke="#e6bfa0" stroke-width="1.5"/>
+        <path d="M108 200 C130 210 170 210 192 200" stroke="#f5c542" stroke-width="4" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div class="ang-head">
+        <img id="angFace1" alt="">
+        <img id="angFace2" alt="">
+      </div>
+      <div class="ang-halo"></div>
+    </div>
+  </div>
+  <div class="ang-sparks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="ang-msg">Cette place vous est offerte <span>🎁</span></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <div id="ufo" aria-hidden="true"><svg class="wob" viewBox="0 0 160 90" width="150">
@@ -731,6 +835,6 @@
   window.addEventListener("hashchange", () => { if (location.hash === "#soucoupe") fly(); });
 })();
 </script>
-<script src="app.js?v=21"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>
