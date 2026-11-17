@@ -320,7 +320,7 @@
 
   async function uploadPdfs(files){
     files = [...files].filter(f => /\.pdf$/i.test(f.name) || f.type === "application/pdf");
-    if (!files.length) { $("addOk").textContent = "Choisissez des fichiers PDF."; return; }
+    if (!files.length) { $("addOk").style.color = "var(--red)"; $("addOk").textContent = "Ce ne sont pas des fichiers PDF."; return; }
     let ok = 0, dup = 0, err = [];
     for (let i = 0; i < files.length; i++) {
       $("addOk").style.color = ""; $("addOk").textContent = `Envoi ${i+1}/${files.length}… ${files[i].name}`;
@@ -336,7 +336,11 @@
     $("pdfIn").value = "";
     await loadAdmin(); await refresh();
   }
-  $("pdfIn").onchange = () => uploadPdfs($("pdfIn").files);
+  $("pdfIn").addEventListener("change", () => {
+    const fl = $("pdfIn").files;
+    $("addOk").style.color = ""; $("addOk").textContent = fl && fl.length ? `${fl.length} fichier(s) choisi(s)…` : "Aucun fichier choisi.";
+    if (fl && fl.length) uploadPdfs(fl).catch(e => { $("addOk").style.color = "var(--red)"; $("addOk").textContent = "Erreur : " + (e && e.message || e); });
+  });
   ["dragenter","dragover"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.add("over"); }));
   ["dragleave","drop"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.remove("over"); }));
   $("drop").addEventListener("drop", e => uploadPdfs(e.dataTransfer.files));
