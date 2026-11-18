@@ -280,10 +280,12 @@ case 'send_place':
     out(['ok' => true]);
 
 case 'films':
+    // kind = "now" (à l'affiche) ou "soon" (prochainement)
     need_login();
+    $soon = (($in['kind'] ?? $_GET['kind'] ?? 'now') === 'soon');
     if (!defined('TMDB_KEY') || TMDB_KEY === '') out(['films' => []]);
-    $cache = __DIR__ . '/data/films.php';
-    $tryFile = __DIR__ . '/data/films.try';
+    $cache = __DIR__ . ($soon ? '/data/soon.php' : '/data/films.php');
+    $tryFile = __DIR__ . ($soon ? '/data/soon.try' : '/data/films.try');
     // Mise à jour une fois par semaine : le mercredi à partir de 8 h (jour des sorties en France)
     $lastWed = strtotime('wednesday this week 08:00');
     if ($lastWed > time()) $lastWed -= 7 * 86400;
@@ -296,31 +298,50 @@ case 'films':
     }
     @touch($tryFile);
     $long = strlen(TMDB_KEY) > 40; // jeton v4 (Bearer) ou clé v3
-    $url = 'https://api.themoviedb.org/3/movie/now_playing?language=fr-FR&region=FR&page=1'
-         . ($long ? '' : '&api_key=' . urlencode(TMDB_KEY));
-    $body = false;
-    if (function_exists('curl_init')) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8,
-            CURLOPT_HTTPHEADER => array_merge(['Accept: application/json'], $long ? ['Authorization: Bearer ' . TMDB_KEY] : [])]);
-        $body = curl_exec($ch);
-        if (curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 200) $body = false;
-        curl_close($ch);
-    } else {
-        $ctx = stream_context_create(['http' => ['timeout' => 8,
-            'header' => "Accept: application/json\r\n" . ($long ? 'Authorization: Bearer ' . TMDB_KEY . "\r\n" : '')]]);
-        $body = @file_get_contents($url, false, $ctx);
+    $results = [];
+    foreach (($soon ? [1, 2, 3] : [1]) as $page) {
+        $url = 'https://api.themoviedb.org/3/movie/' . ($soon ? 'upcoming' : 'now_playing') . '?language=fr-FR&region=FR&page=' . $page
+             . ($long ? '' : '&api_key=' . urlencode(TMDB_KEY));
+        $body = false;
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8,
+                CURLOPT_HTTPHEADER => array_merge(['Accept: application/json'], $long ? ['Authorization: Bearer ' . TMDB_KEY] : [])]);
+            $body = curl_exec($ch);
+            if (curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 200) $body = false;
+            curl_close($ch);
+        } else {
+            $ctx = stream_context_create(['http' => ['timeout' => 8,
+                'header' => "Accept: application/json\r\n" . ($long ? 'Authorization: Bearer ' . TMDB_KEY . "\r\n" : '')]]);
+            $body = @file_get_contents($url, false, $ctx);
+        }
+        $d = $body ? json_decode($body, true) : null;
+        if (!empty($d['results'])) $results = array_merge($results, $d['results']);
+        if (empty($d['total_pages']) || $page >= $d['total_pages']) break;
     }
-    $data = $body ? json_decode($body, true) : null;
+    $data = $results ? ['results' => $results] : null;
     if (!$data || empty($data['results'])) {
         // En cas d'échec, on garde l'ancienne liste si elle existe
         if (is_file($cache)) out(['films' => local_posters(json_decode(substr(file_get_contents($cache), strlen(DB_GUARD)), true) ?: [])]);
         out(['films' => []]);
     }
     $res = $data['results'];
-    usort($res, function ($x, $y) { return ($y['popularity'] ?? 0) <=> ($x['popularity'] ?? 0); });
+    if ($soon) {
+        // Prochainement : uniquement les sorties à venir, de la plus proche à la plus lointaine (sans doublons)
+        $today = date('Y-m-d'); $seen = [];
+        $res = array_values(array_filter($res, function ($m) use ($today, &$seen) {
+            $id = $m['id'] ?? null;
+            if ($id === null || isset($seen[$id]) || empty($m['release_date']) || $m['release_date'] <= $today) return false;
+            return $seen[$id] = true;
+        }));
+        usort($res, function ($x, $y) { return [$x['release_date'], -($x['popularity'] ?? 0)] <=> [$y['release_date'], -($y['popularity'] ?? 0)]; });
+        $res = array_slice($res, 0, 16);
+    } else {
+        usort($res, function ($x, $y) { return ($y['popularity'] ?? 0) <=> ($x['popularity'] ?? 0); });
+        $res = array_slice($res, 0, 12);
+    }
     $films = [];
-    foreach (array_slice($res, 0, 12) as $m) {
+    foreach ($res as $m) {
         $films[] = [
             'title'    => $m['title'] ?? '',
             'date'     => $m['release_date'] ?? null,
@@ -504,8 +525,7 @@ case 'face':
 
 case 'admin_refresh_films':
     need_admin();
-    @unlink(__DIR__ . '/data/films.php');
-    @unlink(__DIR__ . '/data/films.try');
+    foreach (['films.php', 'films.try', 'soon.php', 'soon.try'] as $f) @unlink(__DIR__ . '/data/' . $f);
     out(['ok' => true]);
 
 case 'admin_films_check':

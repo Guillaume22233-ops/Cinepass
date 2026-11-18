@@ -110,30 +110,56 @@
   }
 
   /* ---------- Films à l'affiche ---------- */
-  let films = null, curFilm = null;
+  let films = null, curFilm = null, curKind = "now";
+  const lists = { now: null, soon: null };
   const HUES = [32, 0, 210, 265, 150, 45, 190, 330];
   const fdate = d => d ? new Date(d).toLocaleDateString("fr-FR",{day:"numeric",month:"long"}) : "";
-  function posterHtml(f, i, rank){
+  function posterHtml(f, i, rank, badge){
     // Dégradé + titre toujours présents en fond ; l'affiche (img) se pose dessus si elle se charge.
     const bg = `background:linear-gradient(160deg,hsl(${HUES[i%HUES.length]} 45% 26%),#0c0c0e 85%)`;
     const img = f.poster ? `<img class="pimg" src="${esc(f.poster)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : "";
-    return `<div class="poster" style="${bg}"><div class="ph">${esc(f.title)}</div>${img}${rank ? `<div class="rank">${rank}</div>` : ""}</div>`;
+    return `<div class="poster" style="${bg}"><div class="ph">${esc(f.title)}</div>${img}${rank ? `<div class="rank">${rank}</div>` : ""}${badge ? `<div class="dbadge">${esc(badge)}</div>` : ""}</div>`;
+  }
+  const shortDate = d => new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { day:"numeric", month:"short" });
+  const inDays = d => { const n = daysLeft(d); return n <= 0 ? "" : n === 1 ? "demain" : n < 7 ? `dans ${n} jours` : n < 14 ? "dans 1 semaine" : `dans ${Math.round(n/7)} semaines`; };
+  async function fetchList(kind){
+    if (lists[kind]) return lists[kind];
+    try { lists[kind] = (await api("films", { kind })).films || []; } catch(e){ lists[kind] = []; }
+    return lists[kind];
+  }
+  function renderStrip(){
+    films = lists[curKind] || [];
+    const soon = curKind === "soon";
+    $("strip").innerHTML = films.length ? films.map((f,i) =>
+      `<button class="film" data-i="${i}">${soon ? posterHtml(f,i,null,f.date ? shortDate(f.date) : "") : posterHtml(f,i,i+1)}<div class="ftitle">${esc(f.title)}</div><div class="fdate">${soon ? (f.date ? "Sortie " + inDays(f.date) : "") : (f.date ? "Sorti le " + fdate(f.date) : "")}</div></button>`).join("")
+      : `<div class="fstrip-empty">${soon ? "Pas de sorties annoncées pour l'instant." : "Pas de films pour l'instant."}</div>`;
+    $("strip").querySelectorAll(".film").forEach(b => b.onclick = () => openFilm(+b.dataset.i));
+    $("strip").scrollLeft = 0;
   }
   async function loadFilms(){
-    if (films) return;
-    try { films = (await api("films")).films || []; } catch(e){ films = []; }
-    if (!films.length) return;
-    $("strip").innerHTML = films.map((f,i) =>
-      `<button class="film" data-i="${i}">${posterHtml(f,i,i+1)}<div class="ftitle">${esc(f.title)}</div><div class="fdate">${f.date ? "Sorti le " + fdate(f.date) : ""}</div></button>`).join("");
-    $("strip").querySelectorAll(".film").forEach(b => b.onclick = () => openFilm(+b.dataset.i));
+    const now = await fetchList("now");
+    if (!now.length) return;
+    renderStrip();
     $("films").style.display = "";
   }
+  document.querySelectorAll(".ftab").forEach(t => t.onclick = async () => {
+    if (t.dataset.k === curKind) return;
+    curKind = t.dataset.k;
+    document.querySelectorAll(".ftab").forEach(x => { x.classList.toggle("on", x === t); x.setAttribute("aria-selected", x === t); });
+    if (!lists[curKind]) $("strip").innerHTML = `<div class="fstrip-empty">Chargement…</div>`;
+    await fetchList(curKind);
+    renderStrip();
+  });
   function openFilm(i){
     const f = films[i]; curFilm = f;
     const p = $("fPoster");
     p.outerHTML = posterHtml(f, i).replace('class="poster"', 'class="poster" id="fPoster"');
     $("fTitle").textContent = f.title;
     $("fMeta").textContent = [f.date ? "Sortie : " + fdate(f.date) : "", f.note ? "★ " + f.note.toFixed(1) + "/10" : ""].filter(Boolean).join("  ·  ");
+    const soon = curKind === "soon";
+    $("fBtns").style.display = soon ? "none" : "";
+    $("fSoon").style.display = soon ? "block" : "none";
+    if (soon) $("fSoon").textContent = f.date ? `🗓️ Sortie au cinéma le ${fdate(f.date)} (${inDays(f.date) || "bientôt"})` : "🗓️ Bientôt au cinéma";
     $("fSyn").textContent = f.overview || "Pas de résumé disponible.";
     const n = state ? state.counts : {cinecheque:0,pathe:0};
     $("fCC").disabled = !n.cinecheque; $("fPA").disabled = !n.pathe;
@@ -357,6 +383,7 @@
     const site = r.site || { email:"", links:[] };
     if (document.activeElement !== $("alertEmail")) $("alertEmail").value = site.email || "";
     renderAlerts();
+    renderDash();
     if (document.activeElement !== $("giftRate")) $("giftRate").value = site.giftRate ?? 10;
     faceVer = Date.now(); setFace($("adFace1"), 1); setFace($("adFace2"), 2);
     if (document.activeElement === null || !document.activeElement.closest || !document.activeElement.closest(".pgrid")) {
@@ -371,6 +398,44 @@
   }
 
   let admPay = null, admToday = null;
+
+  /* ---------- Page admin : onglets ---------- */
+  function showTab(p){
+    document.querySelectorAll(".atab").forEach(t => t.classList.toggle("on", t.dataset.p === p));
+    document.querySelectorAll(".apane").forEach(s => s.classList.toggle("on", s.dataset.p === p));
+    try { localStorage.setItem("cc_atab", p); } catch(e){}
+    const pnl = document.querySelector(".panel.apanel"); if (pnl) pnl.scrollTop = 0;
+    $("admOv").scrollTop = 0;
+  }
+  document.querySelectorAll(".atab").forEach(t => t.onclick = () => showTab(t.dataset.p));
+  document.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.st) { const sb = document.querySelector(`#stockType button[data-t="${b.dataset.st}"]`); if (sb) sb.click(); }
+    showTab(b.dataset.go);
+  }));
+  try { const t = localStorage.getItem("cc_atab"); if (t && document.querySelector(`.atab[data-p="${t}"]`)) showTab(t); } catch(e){}
+
+  /* ---------- Tableau de bord ---------- */
+  function renderDash(){
+    const isAvail = c => !c.taken && !(c.expires && daysLeft(c.expires, admToday) < 0);
+    const nCC = admCodes.filter(c => c.type === "cinecheque" && isAvail(c)).length;
+    const nPA = admCodes.filter(c => c.type === "pathe" && isAvail(c)).length;
+    const due = admCodes.filter(c => c.taken && !c.paid);
+    const total = due.reduce((s, c) => s + (c.price || 0), 0);
+    const people = new Set(due.map(c => c.takenBy)).size;
+    const soon = admCodes.filter(c => isAvail(c) && c.expires && daysLeft(c.expires, admToday) <= 14).length;
+    $("kCC").textContent = nCC; $("kPA").textContent = nPA;
+    $("kDue").textContent = eur(total);
+    $("kDueS").textContent = total ? `${people} personne${people > 1 ? "s" : ""}` : "tout est réglé";
+    $("kExp").textContent = soon;
+    document.querySelector('.kpi[data-st="cinecheque"]').classList.toggle("low", nCC <= 1);
+    document.querySelector('.kpi[data-st="pathe"]').classList.toggle("low", nPA <= 1);
+    $("kExp").closest(".kpi").classList.toggle("warn", soon > 0);
+    const recent = admCodes.filter(c => c.taken).sort((a, b) => (b.takenAt || 0) - (a.takenAt || 0)).slice(0, 6);
+    $("recent").innerHTML = recent.length ? recent.map(c => { const T = TYPES[c.type] || { label: c.type, color: "var(--muted)" };
+      const st = c.offered ? `<span class="badge gift" style="grid-column:3;grid-row:2;justify-self:end">Offerte 🎁</span>` : `<span class="badge ${c.paid ? "ok" : "due"}" style="grid-column:3;grid-row:2;justify-self:end">${c.paid ? "Réglé" : "À régler"}</span>`;
+      return `<div class="lrow"><span class="who2">${esc(c.takenBy || "?")}</span><span class="ty" style="color:${T.color}">${esc(T.label)} · ${eur(c.price)}</span><span class="d">${fmt(c.takenAt)}</span><span class="k">${c.file ? "📄 " : ""}${esc(c.code)}</span>${st}</div>`; }).join("")
+      : `<div class="empty">Aucune réservation pour l'instant.</div>`;
+  }
   function renderAlerts(){
     const out = [];
     ["cinecheque","pathe"].forEach(t => {
@@ -415,9 +480,11 @@
     $("filmsOk").style.color = ""; $("filmsOk").textContent = "Mise à jour…";
     try {
       await api("admin_refresh_films");
-      films = null; $("strip").innerHTML = ""; $("films").style.display = "none";
+      lists.now = null; lists.soon = null; films = null; $("strip").innerHTML = ""; $("films").style.display = "none";
       await loadFilms();
-      let msg = (films && films.length) ? `${films.length} films à l'affiche ✓` : "Aucun film reçu (clé TMDB ?)";
+      await fetchList("soon");
+      const nNow = (lists.now || []).length, nSoon = (lists.soon || []).length;
+      let msg = nNow ? `${nNow} films à l'affiche, ${nSoon} prochainement ✓` : "Aucun film reçu (clé TMDB ?)";
       try {
         const d = await api("admin_films_check");
         if (d.withPoster === 0) msg += " · TMDB n'a fourni aucune affiche.";
