@@ -20,3 +20,7 @@ const DEFAULT_PROFILES = ['Profil 1', 'Profil 2', 'Profil 3', 'Profil 4', 'Profi
 // et collez ici la « Clé d'API » (ou le « Jeton d'accès en lecture »).
 // Laissez vide pour masquer la bande de films.
 const TMDB_KEY = '';
+
+// Adresse d'expéditeur des e-mails (facultatif). Idéalement une vraie boîte créée chez Hostinger,
+// par exemple 'cinecodes@votredomaine.fr' : les messages arrivent moins souvent dans les spams.
+// const MAIL_FROM = '';

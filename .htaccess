@@ -1,0 +1,53 @@
+# ============================================================
+#  Ciné Codes — protection, compression et cache
+# ============================================================
+
+# Toujours en https (connexion chiffrée), puis le navigateur s'en souvient (HSTS)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000" env=HTTPS
+</IfModule>
+
+# Pas de liste de fichiers si un dossier n'a pas de page d'accueil
+Options -Indexes
+
+# Le dossier .git (créé par le déploiement Hostinger) n'est jamais accessible
+RedirectMatch 404 /\.git
+
+# Fichiers internes, inutiles côté visiteurs
+<FilesMatch "^(\.gitignore|\.htaccess|README\.md|LISEZ-MOI\.txt|config\.example\.php|config\.php)$">
+  Require all denied
+</FilesMatch>
+
+# En-têtes de sécurité
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "same-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>
+
+# Compression (pages et scripts plus légers à télécharger)
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/plain application/javascript text/javascript application/json image/svg+xml
+</IfModule>
+
+# Cache navigateur : nuages et script (versionné par ?v=) gardés longtemps,
+# la page elle-même toujours vérifiée pour recevoir les mises à jour
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType text/javascript "access plus 1 year"
+  ExpiresByType text/html "access plus 0 seconds"
+</IfModule>
+<IfModule mod_headers.c>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

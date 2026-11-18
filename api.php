@@ -1,6 +1,29 @@
 <?php
 // Ciné Codes — API (PHP 7.4+). Aucune base de données nécessaire.
+
+// ---------- Sessions : cookie protégé, connexion gardée 30 jours ----------
+$https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+$sessDir = __DIR__ . '/data/sessions';
+if (!is_dir($sessDir)) @mkdir($sessDir, 0700, true);
+if (is_dir($sessDir) && is_writable($sessDir)) session_save_path($sessDir);
+ini_set('session.gc_maxlifetime', (string)(30 * 86400));
+ini_set('session.gc_probability', '1');
+ini_set('session.gc_divisor', '100');
+ini_set('session.use_strict_mode', '1');
+session_set_cookie_params(['lifetime' => 30 * 86400, 'path' => '/', 'secure' => $https, 'httponly' => true, 'samesite' => 'Lax']);
 session_start();
+
+// ---------- Anti-CSRF : une requête POST doit venir de ce site ----------
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    $host = preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? '');
+    if ($origin === 'null' || ($origin !== '' && preg_replace('/:\d+$/', '', (string)parse_url($origin, PHP_URL_HOST)) !== $host)) {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(403);
+        echo json_encode(['error' => 'Requête refusée']);
+        exit;
+    }
+}
 if (!is_file(__DIR__ . '/config.php')) {
     header('Content-Type: application/json; charset=utf-8');
     http_response_code(500);
@@ -13,6 +36,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 const DB_FILE = __DIR__ . '/data/db.php';
+const DB_BAK = __DIR__ . '/data/db.bak.php';
 const DB_GUARD = "<?php exit; ?>\n";
 const TYPES = ['cinecheque', 'pathe'];
 const PDF_DIR = __DIR__ . '/data/pdf';
@@ -26,25 +50,55 @@ function out($data, $status = 200) {
 }
 
 /** Ouvre la base avec un verrou exclusif ; $fn(&$db) renvoie [résultat, aÉcrire]. */
-function with_db(callable $fn) {
+/** Lit une version du fichier de base : tableau si valide, null si illisible, [] si absent/vide. */
+function db_read_file($path) {
+    if (!is_file($path)) return [];
+    $raw = (string)@file_get_contents($path);
+    if (strpos($raw, DB_GUARD) === 0) $raw = substr($raw, strlen(DB_GUARD));
+    if (trim($raw) === '') return [];
+    $db = json_decode($raw, true);
+    return is_array($db) ? $db : null;
+}
+
+/**
+ * Ouvre la base sous verrou. $fn(&$db) renvoie [résultat, àÉcrire].
+ * - Lecture seule ($shared) : verrou partagé, plusieurs lecteurs en même temps.
+ * - Écriture : fichier temporaire puis renommage (jamais de fichier à moitié écrit),
+ *   et la version précédente est gardée dans db.bak.php.
+ * - Base illisible : on tente la copie de secours ; sinon erreur, sans rien écraser.
+ */
+function with_db(callable $fn, $shared = false) {
     $dir = dirname(DB_FILE);
     if (!is_dir($dir)) @mkdir($dir, 0755, true);
-    $fp = @fopen(DB_FILE, 'c+');
-    if (!$fp) out(['error' => 'Impossible d\'écrire dans le dossier data/'], 500);
-    flock($fp, LOCK_EX);
-    $raw = stream_get_contents($fp);
-    if (strpos($raw, DB_GUARD) === 0) $raw = substr($raw, strlen(DB_GUARD));
-    $db = $raw ? json_decode($raw, true) : null;
-    if (!is_array($db)) $db = ['profiles' => DEFAULT_PROFILES, 'codes' => []];
-    [$result, $write] = $fn($db);
-    if ($write) {
-        ftruncate($fp, 0);
-        rewind($fp);
-        fwrite($fp, DB_GUARD . json_encode($db, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        fflush($fp);
+    $lock = @fopen($dir . '/db.lock', 'c');
+    if (!$lock) out(['error' => 'Impossible d\'écrire dans le dossier data/'], 500);
+    flock($lock, $shared ? LOCK_SH : LOCK_EX);
+    $db = db_read_file(DB_FILE);
+    if ($db === null) {
+        $db = db_read_file(DB_BAK);
+        if ($db === null || $db === []) {
+            flock($lock, LOCK_UN); fclose($lock);
+            out(['error' => 'Base de données illisible : restaurez data/db.php depuis une sauvegarde (rien n\'a été effacé).'], 500);
+        }
     }
-    flock($fp, LOCK_UN);
-    fclose($fp);
+    if (!$db) $db = ['profiles' => DEFAULT_PROFILES, 'codes' => []];
+    $db += ['profiles' => DEFAULT_PROFILES, 'codes' => []];
+    [$result, $write] = $fn($db);
+    if ($write && !$shared) {
+        $data = DB_GUARD . json_encode($db, JSON_UNESCAPED_UNICODE);
+        $tmp = DB_FILE . '.tmp';
+        if (@file_put_contents($tmp, $data) !== strlen($data)) {
+            @unlink($tmp); flock($lock, LOCK_UN); fclose($lock);
+            out(['error' => "Écriture impossible (disque plein ?) : rien n'a été modifié."], 500);
+        }
+        if (is_file(DB_FILE) && db_read_file(DB_FILE)) @copy(DB_FILE, DB_BAK);
+        if (!@rename($tmp, DB_FILE)) {
+            @unlink($tmp); flock($lock, LOCK_UN); fclose($lock);
+            out(['error' => "Écriture impossible : rien n'a été modifié."], 500);
+        }
+    }
+    flock($lock, LOCK_UN);
+    fclose($lock);
     return $result;
 }
 
@@ -82,14 +136,15 @@ function rearm_alerts(&$db) {
 }
 /** Envoie un e-mail texte, avec un PDF en pièce jointe si besoin. */
 function send_mail($to, $subject, $body, $pdfPath = null, $pdfName = null) {
-    $host = preg_replace('/:\d+$/', '', preg_replace('/^www\./', '', $_SERVER['HTTP_HOST'] ?? 'localhost'));
+    $host = preg_replace('/[^a-z0-9.\-]/', '', strtolower(preg_replace('/:\d+$/', '', preg_replace('/^www\./', '', $_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'] ?? 'localhost'))));
+    $from = (defined('MAIL_FROM') && filter_var(MAIL_FROM, FILTER_VALIDATE_EMAIL)) ? MAIL_FROM : "noreply@$host";
     $subject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
     if (!$pdfPath) {
-        $headers = "From: Cine Codes <noreply@$host>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n";
+        $headers = "From: Cine Codes <$from>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n";
         return @mail($to, $subject, $body, $headers);
     }
     $b = 'cc' . bin2hex(random_bytes(8));
-    $headers = "From: Cine Codes <noreply@$host>\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"$b\"\r\n";
+    $headers = "From: Cine Codes <$from>\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"$b\"\r\n";
     $msg = "--$b\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n$body\r\n"
          . "--$b\r\nContent-Type: application/pdf; name=\"$pdfName\"\r\nContent-Transfer-Encoding: base64\r\n"
          . "Content-Disposition: attachment; filename=\"$pdfName\"\r\n\r\n"
@@ -112,11 +167,66 @@ function local_posters($films) {
     return $films;
 }
 
+/** Anti force brute : 10 mauvais mots de passe par adresse IP = blocage 15 minutes. */
+function fails_file() { return __DIR__ . '/data/fails.php'; }
+function fails_update(callable $fn) {
+    $fp = @fopen(fails_file(), 'c+');
+    if (!$fp) return $fn([]);
+    flock($fp, LOCK_EX);
+    $raw = stream_get_contents($fp);
+    $d = json_decode(substr((string)$raw, strlen(DB_GUARD)), true);
+    if (!is_array($d)) $d = [];
+    $now = time();
+    foreach ($d as $ip => $v) if ($now - ($v['t'] ?? 0) > 900) unset($d[$ip]);
+    $d = $fn($d);
+    ftruncate($fp, 0); rewind($fp); fwrite($fp, DB_GUARD . json_encode($d)); fflush($fp);
+    flock($fp, LOCK_UN); fclose($fp);
+    return $d;
+}
+function client_ip() { return $_SERVER['REMOTE_ADDR'] ?? 'inconnu'; }
+function check_blocked() {
+    $d = fails_update(function ($d) { return $d; });
+    if (($d[client_ip()]['n'] ?? 0) >= 10) out(['error' => 'Trop d\'essais. Réessaie dans 15 minutes.'], 429);
+}
+function record_fail() {
+    fails_update(function ($d) { $ip = client_ip(); $d[$ip] = ['n' => ($d[$ip]['n'] ?? 0) + 1, 't' => $d[$ip]['t'] ?? time()]; return $d; });
+    usleep(400000);
+}
+function clear_fails() { fails_update(function ($d) { unset($d[client_ip()]); return $d; }); }
+
+/** ma***@gmail.com : l'adresse mémorisée n'est jamais renvoyée en entier au navigateur. */
+function mask_email($e) {
+    [$u, $d] = array_pad(explode('@', $e, 2), 2, '');
+    return mb_substr($u, 0, 2) . '***@' . $d;
+}
+
+/** Version des photos de l'ange : change seulement quand une photo est remplacée. */
+function face_version() {
+    $v = 0;
+    foreach (glob(__DIR__ . '/data/ange[12].*') ?: [] as $f) $v = max($v, filemtime($f));
+    return $v;
+}
+
 function need_login() { if (empty($_SESSION['ok'])) out(['error' => 'auth'], 401); }
 function need_admin() { need_login(); if (empty($_SESSION['admin'])) out(['error' => 'admin'], 403); }
 
 $in = json_decode(file_get_contents('php://input'), true) ?: [];
 $a = $_GET['a'] ?? '';
+
+// Les actions ne passent qu'en POST, avec l'en-tête du site (anti-CSRF) ; GET uniquement pour lire un fichier.
+$isPost = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST';
+if (!$isPost && !in_array($a, ['pdf', 'face', 'poster'], true)) out(['error' => 'Méthode non autorisée'], 405);
+if ($isPost && ($_SERVER['HTTP_X_CC'] ?? '') !== '1') out(['error' => 'Requête refusée'], 403);
+
+// Mot de passe changé dans config.php = tout le monde est déconnecté (et l'admin perd ses droits si c'est le mot de passe admin).
+define('SITE_SIG', hash('sha256', 'site|' . SITE_PASSWORD));
+define('ADMIN_SIG', hash('sha256', 'admin|' . ADMIN_PASSWORD));
+if (!empty($_SESSION['ok']) && ($_SESSION['sig'] ?? '') !== SITE_SIG) $_SESSION = [];
+if (!empty($_SESSION['admin']) && ($_SESSION['asig'] ?? '') !== ADMIN_SIG) unset($_SESSION['admin']);
+
+// La session n'est plus verrouillée pendant la requête (affiches, rafraîchissement… en parallèle),
+// sauf pour les actions qui la modifient.
+if (!in_array($a, ['login', 'logout', 'select', 'admin_login', 'admin_profiles'], true)) session_write_close();
 
 switch ($a) {
 
@@ -124,12 +234,14 @@ case 'session':
     out(['ok' => !empty($_SESSION['ok']), 'profile' => $_SESSION['profile'] ?? null, 'admin' => !empty($_SESSION['admin'])]);
 
 case 'login':
+    check_blocked();
     if (is_string($in['password'] ?? null) && hash_equals(SITE_PASSWORD, $in['password'])) {
         session_regenerate_id(true);
-        $_SESSION['ok'] = true;
+        $_SESSION = ['ok' => true, 'sig' => SITE_SIG];
+        clear_fails();
         out(['ok' => true]);
     }
-    sleep(1); // freine les essais en rafale
+    record_fail();
     out(['error' => 'Mot de passe incorrect'], 401);
 
 case 'logout':
@@ -139,12 +251,12 @@ case 'logout':
 
 case 'profiles':
     need_login();
-    out(['profiles' => with_db(function (&$db) { return [$db['profiles'], false]; })]);
+    out(['profiles' => with_db(function (&$db) { return [$db['profiles'], false]; }, true)]);
 
 case 'select':
     need_login();
     $p = $in['profile'] ?? '';
-    $profiles = with_db(function (&$db) { return [$db['profiles'], false]; });
+    $profiles = with_db(function (&$db) { return [$db['profiles'], false]; }, true);
     if (!in_array($p, $profiles, true)) out(['error' => 'Profil inconnu'], 400);
     $_SESSION['profile'] = $p;
     out(['ok' => true]);
@@ -169,8 +281,8 @@ case 'state':
         }
         return [['counts' => $counts, 'mine' => $mine, 'profile' => $me, 'admin' => !empty($_SESSION['admin']),
                  'owed' => round($owed, 2), 'saved' => round($saved, 2), 'pay' => $pay,
-                 'links' => site_settings($db)['links'], 'myEmail' => ($me !== null ? ($db['emails'][$me] ?? '') : '')], false];
-    }));
+                 'links' => site_settings($db)['links'], 'myEmail' => ($me !== null && !empty($db['emails'][$me]) ? mask_email($db['emails'][$me]) : ''), 'faceVer' => face_version()], false];
+    }, true));
 
 case 'claim':
     need_login();
@@ -194,6 +306,9 @@ case 'claim':
         $c['takenAt'] = time() * 1000;
         $c['price'] = pay_settings($db)['price'][$type];
         $c['paid'] = false;
+        $c['offered'] = false;
+        $c['mailed'] = 0;
+        unset($c['paidAt']);
         // Tirage au sort de l'ange : 1 chance sur N que la place soit offerte (0 = jamais)
         $rate = site_settings($db)['giftRate'];
         if ($rate > 0 && random_int(1, $rate) === 1) {
@@ -216,7 +331,7 @@ case 'claim':
         [$to, $left] = $alert;
         $label = TYPE_LABELS[$type];
         $msg = $left === 1 ? "Il ne reste plus qu'une seule place $label sur Ciné Codes." : "Il n'y a plus aucune place $label sur Ciné Codes.";
-        send_mail($to, "Ciné Codes : plus qu'une place $label", "$msg\n\nDernière place prise par : $me.\n\nPense à en racheter si besoin 🙂\n\n(Ce message n'est envoyé qu'une fois, jusqu'au prochain réapprovisionnement.)");
+        send_mail($to, $left === 1 ? "Ciné Codes : plus qu'une place $label" : "Ciné Codes : plus aucune place $label", "$msg\n\nDernière place prise par : $me.\n\nPense à en racheter si besoin 🙂\n\n(Ce message n'est envoyé qu'une fois, jusqu'au prochain réapprovisionnement.)");
     }
     out(['code' => $code]);
 
@@ -248,6 +363,9 @@ case 'send_place':
     $id = (string)($in['id'] ?? '');
     $email = trim((string)($in['email'] ?? ''));
     $remember = !empty($in['remember']);
+    if (!empty($in['useSaved']) && $me !== null) {
+        $email = with_db(function (&$db) use ($me) { return [$db['emails'][$me] ?? '', false]; }, true);
+    }
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) out(['error' => 'Adresse e-mail invalide'], 400);
     $c = with_db(function (&$db) use ($id, $me, $isAdmin, $email, $remember) {
         $found = null;
@@ -292,7 +410,8 @@ case 'films':
     $fresh = is_file($cache) && filemtime($cache) >= $lastWed;
     // En cas d'échec chez TMDB, on ne réessaie qu'une fois par heure (pour ne pas ralentir le site)
     $recentTry = is_file($tryFile) && time() - filemtime($tryFile) < 3600;
-    if ($fresh || (is_file($cache) && $recentTry)) {
+    if ($fresh || $recentTry) {
+        if (!is_file($cache)) out(['films' => []]);
         $raw = substr(file_get_contents($cache), strlen(DB_GUARD));
         out(['films' => local_posters(json_decode($raw, true) ?: [])]);
     }
@@ -394,7 +513,7 @@ case 'pdf':
     $c = with_db(function (&$db) use ($id) {
         foreach ($db['codes'] as $c) if ($c['id'] === $id) return [$c, false];
         return [null, false];
-    });
+    }, true);
     $path = ($c && !empty($c['file'])) ? PDF_DIR . '/' . basename($c['file']) : null;
     if (!$path || !is_file($path) || !($isAdmin || ($c['taken'] && $c['takenBy'] === $me))) {
         header('Content-Type: text/plain; charset=utf-8');
@@ -415,11 +534,15 @@ case 'pdf':
 // ---------- Gestion ----------
 case 'admin_login':
     need_login();
+    check_blocked();
     if (is_string($in['password'] ?? null) && hash_equals(ADMIN_PASSWORD, $in['password'])) {
+        session_regenerate_id(true);
         $_SESSION['admin'] = true;
+        $_SESSION['asig'] = ADMIN_SIG;
+        clear_fails();
         out(['ok' => true]);
     }
-    sleep(1);
+    record_fail();
     out(['error' => 'Mot de passe incorrect'], 401);
 
 case 'admin_state':
@@ -430,8 +553,9 @@ case 'admin_state':
         foreach ($codes as &$c) if ($c['taken']) $c['price'] = code_price($c, $pay);
         $site = site_settings($db);
         $faces = [1 => (bool)glob(__DIR__ . '/data/ange1.*'), 2 => (bool)glob(__DIR__ . '/data/ange2.*')];
-        return [['codes' => $codes, 'profiles' => $db['profiles'], 'pay' => $pay, 'site' => $site, 'today' => date('Y-m-d'), 'faces' => $faces], false];
-    }));
+        $weak = SITE_PASSWORD === 'cinema' || ADMIN_PASSWORD === 'admin-a-changer' || strlen(SITE_PASSWORD) < 6 || strlen(ADMIN_PASSWORD) < 8 || SITE_PASSWORD === ADMIN_PASSWORD;
+        return [['codes' => $codes, 'profiles' => $db['profiles'], 'pay' => $pay, 'site' => $site, 'today' => date('Y-m-d'), 'faces' => $faces, 'weak' => $weak, 'faceVer' => face_version()], false];
+    }, true));
 
 case 'admin_paid':      // marque comme réglés tous les codes d'un profil
 case 'admin_toggle_paid': // inverse l'état « réglé » d'un code
@@ -451,10 +575,15 @@ case 'admin_toggle_paid': // inverse l'état « réglé » d'un code
 
 case 'admin_pay_settings':
     need_admin();
-    $num = function ($v) { $v = (float)str_replace(',', '.', (string)$v); return ($v >= 0 && $v < 1000) ? round($v, 2) : null; };
+    $num = function ($v) {
+        $v = str_replace(',', '.', trim((string)$v));
+        if ($v === '' || !is_numeric($v)) return null;
+        $v = (float)$v;
+        return ($v >= 0 && $v < 1000) ? round($v, 2) : null;
+    };
     $price = ['cinecheque' => $num($in['price']['cinecheque'] ?? ''), 'pathe' => $num($in['price']['pathe'] ?? '')];
     $full  = ['cinecheque' => $num($in['full']['cinecheque'] ?? ''),  'pathe' => $num($in['full']['pathe'] ?? '')];
-    if (in_array(null, $price, true) || in_array(null, $full, true)) out(['error' => 'Prix invalides'], 400);
+    if (in_array(null, $price, true) || in_array(null, $full, true)) out(['error' => 'Prix invalides : entrez des nombres, par exemple 3,80'], 400);
     $phone = mb_substr(trim((string)($in['phone'] ?? '')), 0, 30);
     with_db(function (&$db) use ($price, $full, $phone) {
         $db['pay'] = ['price' => $price, 'full' => $full, 'phone' => $phone];
@@ -486,7 +615,7 @@ case 'admin_site_settings':
 
 case 'admin_test_mail':
     need_admin();
-    $email = with_db(function (&$db) { return [site_settings($db)['email'], false]; });
+    $email = with_db(function (&$db) { return [site_settings($db)['email'], false]; }, true);
     if ($email === '') out(['error' => "Enregistrez d'abord une adresse e-mail"], 400);
     $ok = send_mail($email, 'Ciné Codes : e-mail de test', "Si vous lisez ce message, les alertes « dernière place » de Ciné Codes fonctionnent 🎟️");
     out($ok ? ['ok' => true] : ['error' => "Le serveur n'a pas pu envoyer l'e-mail"], $ok ? 200 : 500);
@@ -502,7 +631,26 @@ case 'admin_upload_face':
     $exts = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_WEBP => 'webp', IMAGETYPE_GIF => 'gif'];
     if (!$info || !isset($exts[$info[2]])) out(['error' => 'Format accepté : JPG, PNG, WEBP ou GIF'], 400);
     foreach (glob(__DIR__ . "/data/ange$n.*") ?: [] as $old) @unlink($old);
-    if (!move_uploaded_file($f['tmp_name'], __DIR__ . "/data/ange$n." . $exts[$info[2]])) out(['error' => "Impossible d'enregistrer l'image"], 500);
+    $saved = false;
+    if (function_exists('imagecreatefromstring')) {
+        $src = @imagecreatefromstring(file_get_contents($f['tmp_name']));
+        if ($src) {
+            // Photo de téléphone : appliquer l'orientation EXIF avant de la supprimer
+            if ($info[2] === IMAGETYPE_JPEG && function_exists('exif_read_data')) {
+                $o = (int)(@exif_read_data($f['tmp_name'])['Orientation'] ?? 1);
+                if ($o === 3) $src = imagerotate($src, 180, 0);
+                elseif ($o === 6) $src = imagerotate($src, -90, 0);
+                elseif ($o === 8) $src = imagerotate($src, 90, 0);
+            }
+            $w = imagesx($src); $h = imagesy($src); $side = min($w, $h);
+            $dst = imagecreatetruecolor(256, 256);
+            imagecopyresampled($dst, $src, 0, 0, (int)(($w - $side) / 2), (int)(($h - $side) / 2), 256, 256, $side, $side);
+            $saved = imagejpeg($dst, __DIR__ . "/data/ange$n.jpg", 86);
+            imagedestroy($dst); imagedestroy($src);
+        }
+    }
+    // Sans la bibliothèque d'images (GD), on garde le fichier tel quel
+    if (!$saved && !move_uploaded_file($f['tmp_name'], __DIR__ . "/data/ange$n." . $exts[$info[2]])) out(['error' => "Impossible d'enregistrer l'image"], 500);
     out(['ok' => true]);
 
 case 'admin_delete_face':
@@ -519,7 +667,7 @@ case 'face':
     $mime = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif'][pathinfo($files[0], PATHINFO_EXTENSION)] ?? 'application/octet-stream';
     header('Content-Type: ' . $mime);
     header('Content-Length: ' . filesize($files[0]));
-    header('Cache-Control: private, max-age=86400');
+    header('Cache-Control: private, max-age=31536000, immutable'); // l'adresse change à chaque nouvelle photo
     readfile($files[0]);
     exit;
 
@@ -616,7 +764,7 @@ case 'admin_restore':
         foreach ($db['codes'] as $i => &$c) {
             if ($c['id'] !== $id) continue;
             if ($a === 'admin_delete') { if (!empty($c['file'])) @unlink(PDF_DIR . '/' . basename($c['file'])); array_splice($db['codes'], $i, 1); }
-            else { $c['taken'] = false; $c['takenBy'] = null; $c['takenAt'] = null; unset($c['price'], $c['paid'], $c['paidAt']); rearm_alerts($db); }
+            else { $c['taken'] = false; $c['takenBy'] = null; $c['takenAt'] = null; unset($c['price'], $c['paid'], $c['paidAt'], $c['offered'], $c['mailed']); rearm_alerts($db); }
             return [null, true];
         }
         return [null, false];
@@ -634,6 +782,12 @@ case 'admin_profiles':
         // Les codes déjà pris suivent le nouveau nom du profil
         foreach ($db['profiles'] as $i => $old) if (isset($p[$i])) $map[$old] = $p[$i];
         foreach ($db['codes'] as &$c) if ($c['takenBy'] !== null && isset($map[$c['takenBy']])) $c['takenBy'] = $map[$c['takenBy']];
+        unset($c);
+        if (!empty($db['emails'])) {
+            $emails = [];
+            foreach ($db['emails'] as $who => $mail) $emails[$map[$who] ?? $who] = $mail;
+            $db['emails'] = $emails;
+        }
         $db['profiles'] = $p;
         return [null, true];
     });

@@ -34,7 +34,7 @@
   async function api(action, body){
     const r = await fetch("api.php?a=" + action, {
       method: "POST", credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-CC": "1" },
       body: JSON.stringify(body || {})
     });
     let data = {};
@@ -53,7 +53,7 @@
     1: "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#ffe1c6"/><path d="M14 40 C16 14 84 14 86 40 C78 26 22 26 14 40Z" fill="#6b4a32"/><circle cx="35" cy="50" r="5" fill="#2b2b2b"/><circle cx="65" cy="50" r="5" fill="#2b2b2b"/><path d="M36 70 Q50 78 64 70" stroke="#2b2b2b" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="24" cy="64" r="6" fill="#ffb3a7" opacity=".7"/><circle cx="76" cy="64" r="6" fill="#ffb3a7" opacity=".7"/></svg>'),
     2: "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#ffe1c6"/><path d="M14 40 C16 14 84 14 86 40 C78 26 22 26 14 40Z" fill="#6b4a32"/><path d="M29 50 Q35 44 41 50" stroke="#2b2b2b" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="65" cy="49" r="5" fill="#2b2b2b"/><path d="M30 64 Q50 90 70 64 Z" fill="#7a2b2b"/><path d="M36 66 L64 66 L62 70 L38 70Z" fill="#fff"/><circle cx="22" cy="62" r="7" fill="#ffb3a7" opacity=".8"/><circle cx="78" cy="62" r="7" fill="#ffb3a7" opacity=".8"/></svg>'),
   };
-  let faceVer = Date.now();
+  let faceVer = 0; // fourni par le serveur (date des photos) : le cache du téléphone sert vraiment
   const faceUrl = n => window.CC_FACE_URL ? window.CC_FACE_URL(n) : "api.php?a=face&n=" + n + "&t=" + faceVer;
   function setFace(img, n){
     const u = faceUrl(n);
@@ -81,7 +81,9 @@
 
   const pdfUrl = (id, dl) => window.CC_PDF_URL ? window.CC_PDF_URL(id, dl) : "api.php?a=pdf&id=" + encodeURIComponent(id) + (dl ? "&dl=1" : "");
   const dfr = d => d ? new Date(d + "T12:00:00").toLocaleDateString("fr-FR", { day:"numeric", month:"short", year:"numeric" }) : "";
-  const daysLeft = (d, today) => Math.round((new Date(d + "T12:00:00") - new Date((today || new Date().toISOString().slice(0,10)) + "T12:00:00")) / 86400000);
+  // Date du jour en heure locale (et non UTC : sinon décalage d'un jour entre minuit et 1-2 h)
+  const localToday = () => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; };
+  const daysLeft = (d, today) => Math.round((new Date(d + "T12:00:00") - new Date((today || localToday()) + "T12:00:00")) / 86400000);
   const eur = v => (Math.round((v||0)*100)/100).toLocaleString("fr-FR",{style:"currency",currency:"EUR"});
   const fmt = ts => ts ? new Date(ts).toLocaleDateString("fr-FR",{day:"2-digit",month:"short"}) + " " + new Date(ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "";
 
@@ -192,15 +194,26 @@
 
   /* ---------- Codes ---------- */
   async function refresh(){
-    try { state = await api("state"); isAdmin = state.admin; render(); }
+    try {
+      state = await api("state"); isAdmin = state.admin;
+      if (state.faceVer) faceVer = state.faceVer;
+      render();
+      if ($("status").textContent.startsWith("Connexion")) $("status").textContent = "";
+    }
     catch(e){ if (e && e.error !== "auth") $("status").textContent = "Connexion au serveur impossible…"; }
   }
-  function startPoll(){ stopPoll(); pollT = setInterval(() => { if (!document.hidden) refresh(); }, 5000); }
+  function startPoll(){ stopPoll(); pollT = setInterval(() => { if (!document.hidden) refresh(); }, 15000); }
   function stopPoll(){ clearInterval(pollT); pollT = null; }
   document.addEventListener("visibilitychange", () => { if (!document.hidden && pollT) refresh(); });
 
-  function render(){
+  let lastSig = "";
+  function render(force){
     if (!state) return;
+    // Toutes les 5 s : on ne redessine que si quelque chose a vraiment changé
+    // (moins de travail pour le téléphone, et les boutons « Annuler ? » ne sont plus réinitialisés)
+    const sig = JSON.stringify([state.counts, state.mine, state.owed, state.pay, state.profile, busy]);
+    if (!force && sig === lastSig) return;
+    lastSig = sig;
     $("status").textContent = "";
     profile = state.profile;
     if (profile) {
@@ -345,15 +358,16 @@
     e.preventDefault();
     if (!curCode) return;
     const email = $("mailTo").value.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const useSaved = !!(state && state.myEmail) && email === state.myEmail;
+    if (!useSaved && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       $("mailTo").classList.add("bad"); $("mailOk").style.color = "var(--red)"; $("mailOk").textContent = "Entre une adresse e-mail valide."; return;
     }
     $("mailBtn").disabled = true; $("mailBtn").textContent = "Envoi…"; $("mailOk").textContent = "";
     try {
-      await api("send_place", { id: curCode.id, email, remember: $("mailRemember").checked });
+      await api("send_place", useSaved ? { id: curCode.id, useSaved: true, remember: $("mailRemember").checked } : { id: curCode.id, email, remember: $("mailRemember").checked });
       $("mailOk").style.color = ""; $("mailOk").textContent = "Envoyé à " + email + " ✓ (regarde aussi dans les spams)";
       $("mailBtn").textContent = "Renvoyer";
-      if (state) state.myEmail = $("mailRemember").checked ? email : "";
+      if (state && !useSaved) { const [u, d] = email.split("@"); state.myEmail = $("mailRemember").checked ? u.slice(0, 2) + "***@" + d : ""; $("mailTo").value = state.myEmail || email; }
     } catch(err){
       $("mailOk").style.color = "var(--red)"; $("mailOk").textContent = err.error || "L'envoi a échoué, réessaie.";
       $("mailBtn").textContent = "Envoyer";
@@ -379,13 +393,13 @@
   }
   async function loadAdmin(){
     const r = await api("admin_state");
-    admCodes = r.codes; profilesList = r.profiles; admPay = r.pay; admToday = r.today;
+    admCodes = r.codes; profilesList = r.profiles; admPay = r.pay; admToday = r.today; admWeak = !!r.weak;
     const site = r.site || { email:"", links:[] };
     if (document.activeElement !== $("alertEmail")) $("alertEmail").value = site.email || "";
     renderAlerts();
     renderDash();
     if (document.activeElement !== $("giftRate")) $("giftRate").value = site.giftRate ?? 10;
-    faceVer = Date.now(); setFace($("adFace1"), 1); setFace($("adFace2"), 2);
+    faceVer = r.faceVer || 0; setFace($("adFace1"), 1); setFace($("adFace2"), 2);
     if (document.activeElement === null || !document.activeElement.closest || !document.activeElement.closest(".pgrid")) {
       $("pCC").value = String(admPay.price.cinecheque).replace(".", ","); $("pPA").value = String(admPay.price.pathe).replace(".", ",");
       $("fCCp").value = String(admPay.full.cinecheque).replace(".", ","); $("fPAp").value = String(admPay.full.pathe).replace(".", ",");
@@ -436,8 +450,10 @@
       return `<div class="lrow"><span class="who2">${esc(c.takenBy || "?")}</span><span class="ty" style="color:${T.color}">${esc(T.label)} · ${eur(c.price)}</span><span class="d">${fmt(c.takenAt)}</span><span class="k">${c.file ? "📄 " : ""}${esc(c.code)}</span>${st}</div>`; }).join("")
       : `<div class="empty">Aucune réservation pour l'instant.</div>`;
   }
+  let admWeak = false;
   function renderAlerts(){
     const out = [];
+    if (admWeak) out.push(["red", "Mots de passe trop simples ou encore ceux par défaut : changez-les dans config.php (au moins 6 caractères pour le site, 8 pour l'admin, et différents)."]);
     ["cinecheque","pathe"].forEach(t => {
       const av = admCodes.filter(c => c.type === t && !c.taken && !(c.expires && daysLeft(c.expires, admToday) < 0));
       if (av.length <= 1) out.push([av.length ? "" : "red", av.length ? `Plus qu'une place ${TYPES[t].label} en stock.` : `Plus aucune place ${TYPES[t].label} en stock.`]);
@@ -466,10 +482,10 @@
     $("giftOk").style.color = ""; $("giftOk").textContent = "Envoi de la photo…";
     const fd = new FormData(); fd.append("n", n); fd.append("file", f);
     try {
-      const r = await fetch("api.php?a=admin_upload_face", { method: "POST", body: fd, credentials: "same-origin" });
+      const r = await fetch("api.php?a=admin_upload_face", { method: "POST", body: fd, credentials: "same-origin", headers: { "X-CC": "1" } });
       let d = {}; try { d = await r.json(); } catch(e){ d = { error: "Réponse invalide (image trop lourde ?)" }; }
       if (!r.ok) throw d;
-      faceVer = Date.now(); setFace($("adFace" + n), n);
+      faceVer = Math.floor(Date.now() / 1000); setFace($("adFace" + n), n);
       $("giftOk").textContent = "Photo enregistrée ✓";
     } catch(e){ $("giftOk").style.color = "var(--red)"; $("giftOk").textContent = e.error || "Erreur"; }
     $("faceIn" + n).value = "";
@@ -579,7 +595,7 @@
       $("addOk").style.color = ""; $("addOk").textContent = `Envoi ${i+1}/${files.length}… ${files[i].name}`;
       const fd = new FormData(); fd.append("type", addType); fd.append("expires", $("addExp").value || ""); fd.append("file", files[i]);
       try {
-        const r = await fetch("api.php?a=admin_upload", { method: "POST", body: fd, credentials: "same-origin" });
+        const r = await fetch("api.php?a=admin_upload", { method: "POST", body: fd, credentials: "same-origin", headers: { "X-CC": "1" } });
         let d = {}; try { d = await r.json(); } catch(e){ d = { error: "réponse invalide (fichier trop gros ?)" }; }
         if (!r.ok) err.push(files[i].name + " : " + (d.error || "erreur")); else if (d.dup) dup++; else ok++;
       } catch(e){ err.push(files[i].name + " : connexion"); }

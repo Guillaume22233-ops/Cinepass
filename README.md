@@ -23,6 +23,11 @@ Ensuite, à chaque modification poussée sur GitHub, il suffit de cliquer sur **
 
 ## Sauvegarde
 
-Téléchargez de temps en temps `data/db.php` : il contient tous les codes.
+Téléchargez de temps en temps **tout le dossier `data/`** :
+- `data/db.php` : places, profils, soldes, historique, réglages (`db.bak.php` = la version précédente, gardée automatiquement) ;
+- `data/pdf/` : les billets PDF (sans eux, une restauration donne des places sans fichier) ;
+- `data/ange1.*`, `data/ange2.*` : les photos de l'ange.
+
+`config.php` (mots de passe, clé TMDB) est à garder aussi, à part.
 
 > GitHub Pages ne convient pas : le site a besoin de PHP.
