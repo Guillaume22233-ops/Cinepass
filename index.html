@@ -501,6 +501,13 @@
   .kpi.low{border-color:rgba(217,59,65,.35);background:#fff5f5}
   .kpi.low b{color:#d93b41}
 
+  /* Actions dans l'historique */
+  .lact{grid-column:1 / -1;display:flex;justify-content:flex-end;gap:6px;margin-top:4px;padding-top:6px;border-top:1px dashed rgba(25,60,110,.12)}
+  .lact button{font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;color:#56687f;background:rgba(255,255,255,.7);border:1px solid rgba(25,60,110,.12)}
+  .lact button:hover{color:#14263d;border-color:rgba(25,60,110,.3)}
+  .lact button.del:hover,.lact button.del.sure{color:#d93b41;border-color:rgba(217,59,65,.4);background:#fff5f5}
+  .lact button.sure{color:#14263d;border-color:#14263d}
+
   /* ===== Optimisations mobile ===== */
   .overlay{overflow-y:auto;-webkit-overflow-scrolling:touch}
   .overlay > .modal,.overlay > .panel{margin:auto}
@@ -694,7 +701,7 @@
 <div class="overlay" id="admOv">
   <div class="panel apanel">
     <div class="row" style="align-items:flex-start">
-      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Espace admin <span style="color:var(--dim)">· v29</span></p></div>
+      <div><h2>Gestion</h2><p style="color:var(--muted);font-size:13px">Espace admin <span style="color:var(--dim)">· v30</span></p></div>
       <button class="iconbtn" id="admClose" style="flex:none">✕</button>
     </div>
 
@@ -927,6 +934,6 @@
   window.addEventListener("hashchange", () => { if (location.hash === "#soucoupe") fly(); });
 })();
 </script>
-<script src="app.js?v=29"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>

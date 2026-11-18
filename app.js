@@ -538,8 +538,19 @@
     $("sum").querySelectorAll(".chip").forEach(b => b.onclick = () => { logFilter = b.dataset.p || null; renderLog(); });
     const rows = taken.filter(c => logFilter === null || c.takenBy === logFilter);
     $("hlog").innerHTML = rows.length ? rows.map(c => { const T = TYPES[c.type] || {label:c.type,color:"var(--muted)"};
-      return `<div class="lrow"><span class="who2">${esc(c.takenBy || "?")}</span><span class="ty" style="color:${T.color}">${esc(T.label)} · ${eur(c.price)}</span><span class="d">${fmt(c.takenAt)}</span><span class="k">${c.file?"📄 ":""}${esc(c.code)}</span>${c.offered ? `<span class="badge gift" style="grid-column:3;grid-row:2;justify-self:end">Offerte 🎁</span>` : `<button class="badge ${c.paid?"ok":"due"}" data-tp="${esc(c.id)}" title="Cliquer pour changer" style="grid-column:3;grid-row:2;justify-self:end">${c.paid?"Réglé":"À régler"}</button>`}</div>`; }).join("")
+      return `<div class="lrow"><span class="who2">${esc(c.takenBy || "?")}</span><span class="ty" style="color:${T.color}">${esc(T.label)} · ${eur(c.price)}</span><span class="d">${fmt(c.takenAt)}</span><span class="k">${c.file?"📄 ":""}${esc(c.code)}</span>${c.offered ? `<span class="badge gift" style="grid-column:3;grid-row:2;justify-self:end">Offerte 🎁</span>` : `<button class="badge ${c.paid?"ok":"due"}" data-tp="${esc(c.id)}" title="Cliquer pour changer" style="grid-column:3;grid-row:2;justify-self:end">${c.paid?"Réglé":"À régler"}</button>`}<div class="lact"><button data-lr="${esc(c.id)}">↺ Remettre en stock</button><button data-ld="${esc(c.id)}" class="del">✕ Supprimer</button></div></div>`; }).join("")
       : `<div class="empty">Aucune place prise pour l'instant.</div>`;
+    const confirmBtn = (b, label, run) => {
+      if (b.dataset.sure !== "1") { b.dataset.sure = "1"; const old = b.textContent; b.textContent = label; b.classList.add("sure");
+        setTimeout(() => { if (b.isConnected) { b.dataset.sure = ""; b.textContent = old; b.classList.remove("sure"); } }, 3000); return; }
+      run();
+    };
+    $("hlog").querySelectorAll("[data-lr]").forEach(b => b.onclick = () => confirmBtn(b, "Confirmer ↺", async () => {
+      try { await api("admin_restore", { id: b.dataset.lr }); toast("Place remise en stock"); await loadAdmin(); await refresh(); } catch(e){ toast(e.error || "Erreur"); }
+    }));
+    $("hlog").querySelectorAll("[data-ld]").forEach(b => b.onclick = () => confirmBtn(b, "Confirmer la suppression", async () => {
+      try { await api("admin_delete", { id: b.dataset.ld }); toast("Supprimé de l'historique"); await loadAdmin(); await refresh(); } catch(e){ toast(e.error || "Erreur"); }
+    }));
     $("hlog").querySelectorAll("[data-tp]").forEach(b => b.onclick = async () => {
       try { await api("admin_toggle_paid", { id: b.dataset.tp }); await loadAdmin(); await refresh(); } catch(e){ toast(e.error || "Erreur"); }
     });
